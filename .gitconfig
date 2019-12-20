@@ -1,0 +1,21 @@
+[user]
+	name = Taylor Hodge
+	email = j.taylor.hodge@gmail.com
+[color]
+	ui = auto
+[credential]
+	helper = osxkeychain
+[core]
+	editor = /usr/bin/vim
+[push]
+	default = upstream
+[merge]
+	conflictstyle = diff3
+[filter "lfs"]
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+[alias]
+	alias = config --get-regexp ^alias\\.
+	co = checkout
