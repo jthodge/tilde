@@ -2,7 +2,7 @@
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-export ZSH="/Users/jth/.oh-my-zsh"
+export ZSH="~/.oh-my-zsh"
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time oh-my-zsh is loaded, in which case,
@@ -142,7 +142,7 @@ export PATH="/usr/local/sbin:$PATH"
 
 # Go Development
 
-export GOPATH="${HOME}/01-projects/golang"
+export GOPATH="${HOME}/golang"
 export GOROOT="$(brew --prefix golang)/libexec"
 export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
 test -d "${GOPATH}" || mkdir "${GOPATH}"
@@ -160,9 +160,6 @@ setTerminalText () {
 stt_both  () { setTerminalText 0 $@; }
 stt_tab   () { setTerminalText 1 $@; }
 stt_title () { setTerminalText 2 $@; }
-
-# trash-cli
-alias rm='trash'
 
 # Racket
 export PATH=$PATH:/Applications/Racket\ v7.4/bin
