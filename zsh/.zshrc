@@ -72,7 +72,7 @@ plugins=(
   osx
   web-search
   zsh-autosuggestions
-  zsh-nvm
+#  zsh-nvm
   zsh-syntax-highlighting
   colored-man-pages
 )
