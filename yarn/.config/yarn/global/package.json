@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "dotenv-cli": "^1.4.0",
-    "now": "^12.1.8",
-    "serve": "^11.2.0"
-  }
-}
