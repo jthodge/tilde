@@ -8,7 +8,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
-ZSH_THEME="robbyrussell"
+ZSH_THEME="spaceship"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -68,11 +68,11 @@ plugins=(
   tmux
   node
   npm
-  nvm
+#  nvm
   osx
   web-search
   zsh-autosuggestions
-#  zsh-nvm
+  zsh-nvm
   zsh-syntax-highlighting
   colored-man-pages
 )
@@ -121,9 +121,9 @@ fo() {
 # Use z to navigate directories
 . ~/z/z.sh
 
-  # Set Spaceship ZSH as a prompt
-  autoload -U promptinit; promptinit
-  prompt spaceship
+# Set Spaceship ZSH as a prompt
+# autoload -U promptinit; promptinit
+# prompt spaceship
 
 # Postgres
 # export PATH="/usr/local/opt/postgresql@10/bin:$PATH"
