@@ -177,3 +177,6 @@ eval "$(rbenv init -)"
 
 # The next line enables shell command completion for gcloud.
 if [ -f '/Users/jth/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/jth/google-cloud-sdk/completion.zsh.inc'; fi
+
+# Increase amount of "old space" node allocates to combat large build sizes
+export NODE_OPTIONS=--max_old_space_size=8192
