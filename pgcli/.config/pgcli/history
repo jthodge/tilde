@@ -28,3 +28,12 @@
 
 # 2019-12-20 16:24:09.764441
 +\q
+
+# 2020-01-21 17:17:33.590274
++select * from connections
+
+# 2020-01-21 17:22:27.907064
++select * from connections where id = 'conn_01DWT71D1QD1PPG0K64CWBNEYK'
+
+# 2020-01-21 17:23:36.023371
++quit
