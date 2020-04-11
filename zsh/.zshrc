@@ -180,3 +180,6 @@ if [ -f '/Users/jth/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/jth/g
 
 # Increase amount of "old space" node allocates to combat large build sizes
 export NODE_OPTIONS=--max_old_space_size=8192
+
+# Rust
+export PATH="$HOME/.cargo/bin:$PATH"
