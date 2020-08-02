@@ -186,3 +186,6 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 # Load rbenv automatically
 eval "$(rbenv init -)"
+
+# Decompress files thave have been compressed with zlib's DEFLATE
+alias inflate='ruby -r zlib -e "STDOUT.write Zlib::Inflate.inflate(STDIN.read)"'
