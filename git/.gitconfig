@@ -19,3 +19,5 @@
 [alias]
 	alias = config --get-regexp ^alias\\.
 	co = checkout
+[init]
+	defaultBranch = main
