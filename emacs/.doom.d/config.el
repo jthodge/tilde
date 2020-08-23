@@ -111,3 +111,6 @@
         '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(C)")))
   (setq org-fancy-priorities-list '("🚨" "🔵" "🟢"))
 )
+
+(map! :desc "Create Sparse Tree" :ne "SPC / s" #'org-sparse-tree)
+(map! :desc "Create Sparse Tree for Tags" :ne "SPC / t" #'org-tags-sparse-tree)
