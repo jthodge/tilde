@@ -93,7 +93,12 @@
   :config
   (org-super-agenda-mode))
 
+(defun make-youtube-link (youtube_id)
+  (browse-url (concat "https://www.youtube.com/embed/" youtube_id)))
+
 (after! org
+  (org-add-link-type "yt" #'make-youtube-link)
+
   (map! :map org-mode-map
         :n "M-j" #'org-metadown
         :n "M-k" #'org-metaup))
