@@ -93,6 +93,11 @@
   :config
   (org-super-agenda-mode))
 
+;; (use-package! org-fancy-priorties
+;;   :hook (org-mode . org-fancy-priorities-mode)
+;;   :config
+;;   (setq org-fancy-priorities-list '("🚨" "🔵" "🟢")))
+
 (defun make-youtube-link (youtube_id)
   (browse-url (concat "https://www.youtube.com/embed/" youtube_id)))
 
@@ -104,4 +109,5 @@
         :n "M-k" #'org-metaup)
   (setq org-todo-keywords
         '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(C)")))
+  (setq org-fancy-priorities-list '("🚨" "🔵" "🟢"))
 )
