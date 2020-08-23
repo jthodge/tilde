@@ -92,3 +92,8 @@
                                    :rag "hi")))
   :config
   (org-super-agenda-mode))
+
+(after! org
+  (map! :map org-mode-map
+        :n "M-j" #'org-metadown
+        :n "M-k" #'org-metaup))
