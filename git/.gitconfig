@@ -21,3 +21,7 @@
 	co = checkout
 [init]
 	defaultBranch = main
+[github]
+	user = jthodge
+[forge]
+	remote = origin
