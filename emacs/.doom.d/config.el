@@ -55,7 +55,7 @@
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
 (setq display-line-numbers-type t)
 
-(setq projectile-project-search-path '("~/workos/"))
+(setq projectile-project-search-path '("~/01-projects/" "~/02-areas/" "~/03-resources/" "~/04-archives/" "~/tilde/" "~/z/"))
 
 ;; Here are some additional functions/macros that could help you configure Doom:
 ;;
