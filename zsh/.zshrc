@@ -166,10 +166,7 @@ export PATH=$PATH:/Applications/Racket\ v7.4/bin
 
 export WORKOS_API_KEY=sk_test_rtc36nwltQYayMS4884qgkC8y
 
-export VOLTA_HOME="$HOME/.volta"
-[ -s "$VOLTA_HOME/load.sh" ] && . "$VOLTA_HOME/load.sh"
 
-export PATH="$VOLTA_HOME/bin:$PATH"
 # The next line updates PATH for the Google Cloud SDK.
 if [ -f '/Users/jth/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/jth/google-cloud-sdk/path.zsh.inc'; fi
 
@@ -189,3 +186,4 @@ eval "$(rbenv init -)"
 
 # Decompress files thave have been compressed with zlib's DEFLATE
 alias inflate='ruby -r zlib -e "STDOUT.write Zlib::Inflate.inflate(STDIN.read)"'
+
