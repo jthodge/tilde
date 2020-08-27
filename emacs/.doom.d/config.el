@@ -108,6 +108,17 @@
   (setq org-todo-keywords
         '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(C)")))
   (setq org-fancy-priorities-list '("🚨" "🔵" "🟢"))
+  (setq org-capture-templates
+      '(("t" "Task" entry (file+headline "~/org/todo.org" "Inbox")
+         "* TODO %?\n")
+        ("p" "Project" entry (file+headline "~/org/todo.org" "01 Projects")
+         (file "~/org/templates/new-project-template.org"))
+        ("s" "Someday" entry (file+headline "~/org/someday-maybe.org" "Someday || Maybe")
+         "* SOMEDAY %?\n")
+        ("m" "Maybe" entry (file+headline "~/org/someday-maybe.org" "Someday || Maybe")
+         "* MAYBE %?\n")
+        ("j" "Journal" entry (file+datetree "~/org/journal.org")
+         (file "~/org/templates/new-journal-template.org"))))
 )
 
 (map! :desc "Create Sparse Tree" :ne "SPC / s" #'org-sparse-tree)
