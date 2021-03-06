@@ -118,3 +118,5 @@
 2021-02-17 13:35:52,464 (87181/MainThread) pgcli.main WARNING - import keyring failed: ModuleNotFoundError("No module named 'keyring'").
 2021-02-23 14:11:03,950 (81793/MainThread) pgcli.main INFO - Default pager found in PAGER environment variable: "less"
 2021-02-23 14:11:03,951 (81793/MainThread) pgcli.main WARNING - import keyring failed: ModuleNotFoundError("No module named 'keyring'").
+2021-03-03 14:50:36,130 (77607/MainThread) pgcli.main INFO - Default pager found in PAGER environment variable: "less"
+2021-03-03 14:50:36,131 (77607/MainThread) pgcli.main WARNING - import keyring failed: ModuleNotFoundError("No module named 'keyring'").
