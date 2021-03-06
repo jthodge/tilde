@@ -190,6 +190,7 @@ alias inflate='ruby -r zlib -e "STDOUT.write Zlib::Inflate.inflate(STDIN.read)"'
 export VOLTA_HOME="$HOME/.volta"
 export PATH="$VOLTA_HOME/bin:$PATH"
 
+export PATH="$HOME/.jenv/bin:$PATH"
 eval "$(jenv init -)"
 
 eval $(thefuck --alias)
