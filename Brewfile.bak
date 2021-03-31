@@ -16,6 +16,7 @@ brew "emacs", link: false
 brew "cask"
 brew "certbot"
 brew "cmake"
+brew "deno"
 brew "go"
 brew "dep"
 brew "dive"
