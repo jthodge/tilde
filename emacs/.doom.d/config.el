@@ -123,3 +123,4 @@
 
 (map! :desc "Create Sparse Tree" :ne "SPC / s" #'org-sparse-tree)
 (map! :desc "Create Sparse Tree for Tags" :ne "SPC / t" #'org-tags-sparse-tree)
+
