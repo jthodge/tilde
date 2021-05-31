@@ -12,7 +12,7 @@ tap "pingidentity/devops"
 brew "awscli"
 brew "bat"
 brew "glib"
-brew "emacs", link: false
+brew "emacs"
 brew "cask"
 brew "certbot"
 brew "cmake"
