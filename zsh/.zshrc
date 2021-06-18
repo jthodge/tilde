@@ -194,3 +194,4 @@ export PATH="$HOME/.jenv/bin:$PATH"
 eval "$(jenv init -)"
 
 eval $(thefuck --alias)
+eval "$(mcfly init zsh)"
