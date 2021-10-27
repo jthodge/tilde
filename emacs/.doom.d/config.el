@@ -106,7 +106,15 @@
         :n "M-j" #'org-metadown
         :n "M-k" #'org-metaup)
   (setq org-todo-keywords
-        '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(C)")))
+        '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELED(C)")))
+  (setq org-agenda-files '("~/org/inbox.org"
+                         "~/org/tasks.org"
+                         "~/org/01-projects.org"
+                         "~/org/02-areas.org"
+                         "~/org/03-resources.org"
+                         "~/org/04-archives.org"
+                         "~/org/tickler.org"))
+  (setq org-refile-targets '((org-agenda-files :maxlevel . 3)))
   (setq org-fancy-priorities-list '("🚨" "🔵" "🟢"))
   (setq org-capture-templates
       '(("t" "Task" entry (file+headline "~/org/todo.org" "Inbox")
