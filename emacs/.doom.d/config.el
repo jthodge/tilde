@@ -107,6 +107,12 @@
         :n "M-k" #'org-metaup)
   (setq org-todo-keywords
         '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELED(C)")))
+  (setq org-todo-keyword-faces
+        '(("TODO" :foreground "#7c7c75" :weight normal :underline t)
+          ("INPROGRESS" :foreground "#0098dd" :weight normal :underline t)
+          ("BLOCKED" :foreground "#9f7efe" :weight normal :underline t)
+          ("DONE" :foreground "#50a14f" :weight normal :underline t)
+          ("CANCELED" :foreground "#ff6480" :weight normal :underline t)))
   (setq org-agenda-files '("~/org/inbox.org"
                          "~/org/tasks.org"
                          "~/org/01-projects.org"
