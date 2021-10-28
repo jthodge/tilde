@@ -75,65 +75,64 @@
 (use-package! org-super-agenda
   :after org-agenda
   :init
+  (setq org-agenda-skip-scheduled-if-done t
+      org-agenda-skip-deadline-if-done t
+      org-agenda-include-deadlines t
+      org-agenda-block-separator nil
+      org-agenda-compact-blocks t
+      org-agenda-start-day nil ;; i.e. today
+      org-agenda-span 1
+      org-agenda-start-on-weekday nil)
   (setq org-super-agenda-groups '((:name "Today"
                                    :time-grid t
                                    :scheduled today)
                                   (:name "Due today"
                                    :deadline today)
-                                  (:name "Important"
-                                   :priority "A")
-                                  (:name "Overdue"
+                                  ;; (:name "Important"
+                                  ;;  :priority "A")
+                                  (:name "Late"
                                    :deadline past)
-                                  (:name "Due soon"
-                                   :deadline future)
-                                  (:name "High Impact"
-                                   :rag "hi")))
-  :config
+                                  (:name "Upcoming"
+                                   :deadline future)))
+                                  ;; (:name "Large impact"
+                                  ;;  :tag "li")))
+ :config
   (org-super-agenda-mode))
-
-;; (use-package! org-fancy-priorties
-;;   :hook (org-mode . org-fancy-priorities-mode)
-;;   :config
-;;   (setq org-fancy-priorities-list '("🚨" "🔵" "🟢")))
 
 (defun make-youtube-link (youtube_id)
   (browse-url (concat "https://www.youtube.com/embed/" youtube_id)))
 
 (after! org
   (org-add-link-type "yt" #'make-youtube-link)
-
   (map! :map org-mode-map
         :n "M-j" #'org-metadown
         :n "M-k" #'org-metaup)
-  (setq org-todo-keywords
-        '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELED(C)")))
-  (setq org-todo-keyword-faces
-        '(("TODO" :foreground "#7c7c75" :weight normal :underline t)
-          ("INPROGRESS" :foreground "#0098dd" :weight normal :underline t)
-          ("BLOCKED" :foreground "#9f7efe" :weight normal :underline t)
-          ("DONE" :foreground "#50a14f" :weight normal :underline t)
-          ("CANCELED" :foreground "#ff6480" :weight normal :underline t)))
-  (setq org-agenda-files '("~/org/inbox.org"
-                         "~/org/tasks.org"
-                         "~/org/01-projects.org"
-                         "~/org/02-areas.org"
-                         "~/org/03-resources.org"
-                         "~/org/04-archives.org"
-                         "~/org/tickler.org"))
-  (setq org-refile-targets '((org-agenda-files :maxlevel . 3)))
-  (setq org-fancy-priorities-list '("🚨" "🔵" "🟢"))
-  (setq org-capture-templates
-      '(("t" "Task" entry (file+headline "~/org/todo.org" "Inbox")
-         "* TODO %?\n")
-        ("p" "Project" entry (file+headline "~/org/todo.org" "01 Projects")
-         (file "~/org/templates/new-project-template.org"))
-        ("s" "Someday" entry (file+headline "~/org/someday-maybe.org" "Someday || Maybe")
-         "* SOMEDAY %?\n")
-        ("m" "Maybe" entry (file+headline "~/org/someday-maybe.org" "Someday || Maybe")
-         "* MAYBE %?\n")
-        ("j" "Journal" entry (file+datetree "~/org/journal.org")
-         (file "~/org/templates/new-journal-template.org"))))
-)
+  (setq
+   org-agenda-files '("~/org/inbox.org"
+                      "~/org/tasks.org"
+                      "~/org/01-projects.org"
+                      "~/org/02-areas.org"
+                      "~/org/03-resources.org"
+                      "~/org/04-archives.org"
+                      "~/org/tickler.org")
+   org-capture-templates '(("t" "Task" entry (file+headline "~/org/todo.org" "Inbox")
+                            "* TODO %?\n")
+                           ("p" "Project" entry (file+headline "~/org/todo.org" "01 Projects")
+                            (file "~/org/templates/new-project-template.org"))
+                           ("s" "Someday" entry (file+headline "~/org/someday-maybe.org" "Someday || Maybe")
+                            "* SOMEDAY %?\n")
+                           ("m" "Maybe" entry (file+headline "~/org/someday-maybe.org" "Someday || Maybe")
+                            "* MAYBE %?\n")
+                           ("j" "Journal" entry (file+datetree "~/org/journal.org")
+                            (file "~/org/templates/new-journal-template.org")))
+   org-log-done t
+   org-refile-targets '((org-agenda-files :maxlevel . 3))
+   org-todo-keywords '((sequence "TODO(t)" "INPROGRESS(i)" "BLOCKED(b)" "|" "DONE(d)" "CANCELED(C)"))
+   org-todo-keyword-faces '(("TODO" :foreground "#7c7c75" :weight normal :underline t)
+                            ("INPROGRESS" :foreground "#0098dd" :weight normal :underline t)
+                            ("BLOCKED" :foreground "#9f7efe" :weight normal :underline t)
+                            ("DONE" :foreground "#50a14f" :weight normal :underline t)
+                            ("CANCELED" :foreground "#ff6480" :weight normal :underline t))))
 
 (map! :desc "Create Sparse Tree" :ne "SPC / s" #'org-sparse-tree)
 (map! :desc "Create Sparse Tree for Tags" :ne "SPC / t" #'org-tags-sparse-tree)
