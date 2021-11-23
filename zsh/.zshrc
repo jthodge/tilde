@@ -69,7 +69,7 @@ plugins=(
   node
   npm
 #  nvm
-  osx
+  macos
   web-search
   zsh-autosuggestions
 #  zsh-nvm
