@@ -195,3 +195,6 @@ eval "$(jenv init -)"
 
 eval $(thefuck --alias)
 eval "$(mcfly init zsh)"
+
+alias dc=docker-compose
+
