@@ -69,7 +69,7 @@ plugins=(
   node
   npm
 #  nvm
-  osx
+  macos
   web-search
   zsh-autosuggestions
 #  zsh-nvm
@@ -195,3 +195,6 @@ eval "$(jenv init -)"
 
 eval $(thefuck --alias)
 eval "$(mcfly init zsh)"
+
+alias dc=docker-compose
+
