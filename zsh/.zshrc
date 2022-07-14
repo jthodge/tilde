@@ -198,3 +198,13 @@ eval "$(mcfly init zsh)"
 
 alias dc=docker-compose
 
+export PATH="$HOME/.poetry/bin:$PATH"
+
+export PATH="$PATH:$HOME/.local/bin"
+
+export PYENV_ROOT="$HOME/.pyenv"
+command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+
+
+[[ -e ~/.profile ]] && emulate sh -c 'source ~/.profile'
