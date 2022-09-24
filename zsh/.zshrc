@@ -208,3 +208,10 @@ eval "$(pyenv init -)"
 
 
 [[ -e ~/.profile ]] && emulate sh -c 'source ~/.profile'
+
+# bun completions
+[ -s "/Users/th/.bun/_bun" ] && source "/Users/th/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
