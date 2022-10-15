@@ -215,3 +215,6 @@ eval "$(pyenv init -)"
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
+
+# opam configuration
+[[ ! -r /Users/th/.opam/opam-init/init.zsh ]] || source /Users/th/.opam/opam-init/init.zsh  > /dev/null 2> /dev/null
