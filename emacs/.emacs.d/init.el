@@ -130,3 +130,17 @@
 ;; Configure SBCL as SLIME's Lisp Compiler
 (add-to-list 'exec-path "/usr/local/bin")
 (setq inferior-lisp-program "sbcl")
+
+;; Congfigure tree-sitter
+(use-package tree-sitter
+             :ensure t
+             :config
+             ;; Activate tree-sitter on all buffers containing code it has a parser available for
+             (global-tree-sitter-mode)
+             ;; tree-sitter-hl-mode causes immediately observable improvements for py, ts, and tsx
+             ;; Enable/disable flag to compare results
+             (add-hook 'tree-sitter-after-on-hook #'tree-sitter-hl-mode))
+
+(use-package tree-sitter-langs
+             :ensure t
+             :after tree-sitter)
