@@ -84,12 +84,18 @@
 (add-hook 'ielm-mode-hook 'enable-paredit-mode)
 (add-hook 'lisp-interaction-mode-hook 'enable-paredit-mode)
 (add-hook 'lisp-mode-hook 'enable-paredit-mode)
+(add-hook 'slime-repl-mode-hook 'enable-paredit-mode)
+(defun override-slime-del-key ()
+  (define-key slime-repl-mode-map
+    (read-kbd-macro paredit-backward-delete-key) nil))
+(add-hook 'slime-repl-mode-hook 'override-slime-del-key)
 
 ;; Add Rainbow Delimiters Hooks
 (add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'ielm-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'lisp-interaction-mode-hook 'rainbow-delimiters-mode)
 (add-hook 'lisp-mode-hook 'rainbow-delimiters-mode)
+(add-hook 'slime-repl-mode-hook 'rainbow-delimiters-mode)
 
 ;; Confiure Rainbow Delimiters Theme
 (require 'rainbow-delimiters)
@@ -117,3 +123,7 @@
 (require 'server)
 (unless (server-running-p)
   (server-start))
+
+;; Configure SBCL as SLIME's Lisp Compiler
+(add-to-list 'exec-path "/usr/local/bin")
+(setq inferior-lisp-program "sbcl")
