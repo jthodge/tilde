@@ -1,5 +1,8 @@
 ;; init.el
 
+(require 'use-package)
+(require 'quelpa-use-package)
+
 ;; Configure UI
 (menu-bar-mode 0)
 (when (display-graphic-p)
@@ -73,6 +76,10 @@
 (unless package-archive-contents
   (package-refresh-contents))
 
+;; Ensure Environment Variable Parity Between Emacs and Shell
+(when (memq window-system '(mac ns x))
+  (exec-path-from-shell-initialize))
+
 ;; Install packages
 (dolist (package '(markdown-mode paredit rainbow-delimiters))
   (unless (package-installed-p package)
@@ -131,16 +138,63 @@
 (add-to-list 'exec-path "/usr/local/bin")
 (setq inferior-lisp-program "sbcl")
 
-;; Congfigure tree-sitter
+;; Congfigure tree-sitter for General Use
 (use-package tree-sitter
              :ensure t
              :config
              ;; Activate tree-sitter on all buffers containing code it has a parser available for
              (global-tree-sitter-mode)
              ;; tree-sitter-hl-mode causes immediately observable improvements for py, ts, and tsx
-             ;; Enable/disable flag to compare results
+             ;; Enable/disable flag to compare results:
+             ;; M-x tree-sitter-hl-mode
              (add-hook 'tree-sitter-after-on-hook #'tree-sitter-hl-mode))
 
 (use-package tree-sitter-langs
              :ensure t
              :after tree-sitter)
+
+;; Use tree-sitter Dedicated tsx Parser for .tsx Files
+;; Default behavior: tree-sitter uses typescript parser, which does not parse .tsx
+;; To do so, create a derived mode that maps to both .ts and .tsx
+;; The TypeScript language server will select tsx support based on the derived mode's name
+;; tree-sitter will select its tsx parser based on the explicit mapping
+(use-package typescript-mode
+  :after tree-sitter
+  :config
+  ;; Using this instead of tsx-mode to allows eglot to automatically determine and configure the server language
+  ;; https://github.com/joaotavora/eglot/issues/624
+  ;; https://github.com/joaotavora/eglot/pull/674
+  (define-derived-mode typescriptreact-mode typescript-mode
+    "TypeScript TSX")
+
+  ;; Use the derived mode for .tsx files
+  (add-to-list 'auto-mode-alist '("\\.tsx?\\'" . typescriptreact-mode))
+  ;; By default, typescript-mode is mapped to the tree-sitter typescript parser
+  ;; To change that behavior, use the derived mode to map .tsx _and_ .ts to typescriptreact-mode to tsx
+  (add-to-list 'tree-sitter-major-mode-language-alist '(typescriptreact-mode . tsx)))
+
+;; Configure tsi.el to Provide tree-sitter Indentation for TypeScript/JavaScript/TSX/JSX, JSON, and S/CSS
+;; https://github.com/orzechowskid/tsi.el/
+(use-package tsi
+  :after tree-sitter
+  ;; tsi.el hasn't been release on melpa, yet
+  :quelpa (tsi :fetcher github :repo "orzechowskid/tsi.el")
+  :commands (tsi-typescript-mode tsi-json-mode tsi-css-mode)
+  :init
+  (add-hook 'typescript-mode-hook (lambda () (tsi-typescript-mode 1)))
+  (add-hook 'json-mode-hook (lambda () (tsi-json-mode 1)))
+  (add-hook 'css-mode-hook (lambda () (tsi-css-mode 1)))
+  (add-hook 'scss-mode-hook (lambda () (tsi-scss-mode 1))))
+
+;; Auto-fomat on Save
+;; https://github.com/radian-software/apheleia
+(use-package apheleia
+  :ensure t
+  :config
+  (apheleia-global-mode +1))
+
+;; Configure eglot
+;; Alternative to lsp-mode
+(use-package eglot
+  :ure t)
+
