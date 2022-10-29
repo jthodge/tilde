@@ -118,6 +118,9 @@
 ;; Custom Key Sequences
 (global-set-key (kbd "C-c t") 'show-current-time)
 (global-set-key (kbd "C-c d") 'delete-trailing-whitespace)
+(global-set-key (kbd "C-c l") #'org-store-link)
+(global-set-key (kbd "C-c a") #'org-agenda)
+(global-set-key (kbd "C-c c") #'org-capture)
 
 ;; Spin Up Server
 (require 'server)
