@@ -266,3 +266,11 @@
 (when (require 'flycheck nil t)
   (setq elpy-modules (delq 'elpy-module-flymake elpy-modules))
   (add-hook 'elpy-mode-hook 'flycheck-mode))
+
+;; Configure Automatic Code Formatting
+;; Black is preferred, and used by default of being installed
+;; This configures autopep8
+;; Install py-autopep8 package to use
+;; (require 'py-autopep8)
+;; (add-hook 'elpy-mode-hook 'py-autopep8-enable-on-save)
+
