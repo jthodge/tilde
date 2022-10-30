@@ -6,7 +6,7 @@
  '(custom-safe-themes
    '("3a9f65e0004068ecf4cf31f4e68ba49af56993c20258f3a49e06638c825fbfb6" default))
  '(package-selected-packages
-   '(exec-path-from-shell tsi eglot apheleia quelpa-use-package quelpa typescript-mode use-package tree-sitter-langs tree-sitter treemacs slime magit ujelly-theme rainbow-delimiters paredit markdown-mode)))
+   '(flycheck exec-path-from-shell tsi eglot apheleia quelpa-use-package quelpa typescript-mode use-package tree-sitter-langs tree-sitter treemacs slime magit ujelly-theme rainbow-delimiters paredit markdown-mode)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

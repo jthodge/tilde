@@ -261,3 +261,8 @@
 ;; (setq elpy-rpc-virtualenv-path "/Users/th/.pyenv/versions/3.11.0a1/envs/elpy-rpc")
 ;; (setq elpy-rpc-virtualenv-path "/Users/th/tilde/emacs/elpy-epc-virtualenv")
 ;; (setq elpy-rpc-virtualenv-path 'current)
+
+;; Configure Flycheck for On-the-fly Syntax Checking
+(when (require 'flycheck nil t)
+  (setq elpy-modules (delq 'elpy-module-flymake elpy-modules))
+  (add-hook 'elpy-mode-hook 'flycheck-mode))
