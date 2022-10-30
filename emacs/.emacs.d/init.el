@@ -186,7 +186,7 @@
   (add-hook 'css-mode-hook (lambda () (tsi-css-mode 1)))
   (add-hook 'scss-mode-hook (lambda () (tsi-scss-mode 1))))
 
-;; Auto-fomat on Save
+;; Auto-format on Save
 ;; https://github.com/radian-software/apheleia
 (use-package apheleia
   :ensure t
@@ -196,5 +196,68 @@
 ;; Configure eglot
 ;; Alternative to lsp-mode
 (use-package eglot
-  :ure t)
+  :ensure t)
 
+;; Configure elpy
+;; (elpy-enable)
+(use-package elpy
+  :ensure t
+  :init
+  (elpy-enable))
+(pyenv-mode)
+(setq python-shell-completion-native-enable nil)
+
+;; (use-package elpy
+;;     :init
+;;     (add-to-list 'auto-mode-alist '("\\.py$" . python-mode))
+;;     :bind (:map elpy-mode-map
+;;           ("<M-left>" . nil)
+;;           ("<M-right>" . nil)
+;;           ("<M-S-left>" . elpy-nav-indent-shift-left)
+;;           ("<M-S-right>" . elpy-nav-indent-shift-right)
+;;           ("M-." . elpy-goto-definition)
+;;           ("M-," . pop-tag-mark))
+;;     :config
+;;     (setq elpy-rpc-backend "jedi"))
+
+;; (use-package python
+;;   :mode ("\\.py" . python-mode)
+;;   :config
+;;   (setq python-indent-offset 4)
+;;   (elpy-enable))
+
+;; (use-package pyenv-mode
+;;   :init
+;;   (add-to-list 'exec-path "~/.pyenv/shims")
+;;   (setenv "WORKON_HOME" "~/.pyenv/versions/")
+;;   :config
+;;   (pyenv-mode)
+;;   :bind
+;;   ("C-x p e" . pyenv-activate-current-project))
+
+;; (defun pyenv-activate-current-project ()
+;;   "Automatically activates pyenv version if .python-version file exists."
+;;   (interactive)
+;;   (f-traverse-upwards
+;;    (lambda (path)
+;;      (message path)
+;;      (let ((pyenv-version-path (f-expand ".python-version" path)))
+;;        (if (f-exists? pyenv-version-path)
+;;             (let ((pyenv-current-version (s-trim (f-read-text pyenv-version-path 'utf-8))))
+;;               (pyenv-mode-set pyenv-current-version)
+;;               (message (concat "Setting virtualenv to " pyenv-current-version))))))))
+
+;; (defvar pyenv-current-version nil nil)
+
+;; (defun pyenv-init()
+;;   "Initialize pyenv's current version to the global one."
+;;   (let ((global-pyenv (replace-regexp-in-string "\n" "" (shell-command-to-string "pyenv global"))))
+;;     (message (concat "Setting pyenv version to " global-pyenv))
+;;     (pyenv-mode-set global-pyenv)
+;;     (setq pyenv-current-version global-pyenv)))
+
+;; (add-hook 'after-init-hook 'pyenv-init)
+
+;; (setq elpy-rpc-virtualenv-path "/Users/th/.pyenv/versions/3.11.0a1/envs/elpy-rpc")
+;; (setq elpy-rpc-virtualenv-path "/Users/th/tilde/emacs/elpy-epc-virtualenv")
+;; (setq elpy-rpc-virtualenv-path 'current)
