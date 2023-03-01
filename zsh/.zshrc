@@ -106,6 +106,18 @@ export PATH="$PATH:$HOME/.local/bin"
 # Configure opam
 [[ ! -r /Users/th/.opam/opam-init/init.zsh ]] || source /Users/th/.opam/opam-init/init.zsh  > /dev/null 2> /dev/null
 
+# Enable shell output coloring to colorize:
+# ls
+# man
+export TERM="xterm-256color" CLICOLOR=1
+export LESS_TERMCAP_mb=$(print -P "%F{cyan}") \
+    LESS_TERMCAP_md=$(print -P "%B%F{red}") \
+    LESS_TERMCAP_me=$(print -P "%f%b") \
+    LESS_TERMCAP_so=$(print -P "%K{magenta}") \
+    LESS_TERMCAP_se=$(print -P "%K{black}") \
+    LESS_TERMCAP_us=$(print -P "%U%F{green}") \
+    LESS_TERMCAP_ue=$(print -P "%f%u")
+
 # Enable zsh-syntax-highlighting plugin
 # N.B. _THIS MUST BE SOURCED AT THE END OF .zshrc
 # https://github.com/zsh-users/zsh-syntax-highlighting/tree/master
