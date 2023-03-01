@@ -2,9 +2,11 @@
 # Configuration located at tilde/zsh/.spaceshiprc.zsh
 source "/usr/local/opt/spaceship/spaceship.zsh"
 
+# DEPRECATED:
+# zoxide is preferred to z
 # Configure z navigation
 # https://github.com/rupa/z
-. ~/z/z.sh
+# . ~/z/z.sh
 
 # Remove duplicate history when reverse-searching commands
 # TODO: relocate env vars to .zshenv
@@ -21,10 +23,17 @@ setopt hist_save_no_dups
 setopt hist_ignore_dups
 setopt hist_find_no_dups
 
+# DEPRECATED:
+# zoxide is preferred to the method below
 # Enable case-insensitive command autocompletion
 # https://superuser.com/questions/1092033/how-can-i-make-zsh-tab-completion-fix-capitalization-errors-for-directories-and
 autoload -U compinit && compinit
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+# zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+# Configure zoxide
+# https://github.com/ajeetdsouza/zoxide#installation
+# "For completions to work, the above line must be added after compinit is called. You may have to rebuild your completions cache by running rm ~/.zcompdump*; compinit."
+eval "$(zoxide init zsh)"
 
 # Enable emacs-flavored keybindings
 bindkey -e
