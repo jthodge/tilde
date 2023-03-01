@@ -1,3 +1,7 @@
+# Contains configuration for:
+# magit
+# delta (https://github.com/dandavison/delta)
+
 [user]
 	name = Taylor Hodge
 	email = j.taylor.hodge@gmail.com
@@ -7,6 +11,7 @@
 	helper = osxkeychain
 [core]
 	editor = /usr/bin/vim
+    pager = delta
 [push]
 	default = upstream
 [merge]
@@ -25,3 +30,12 @@
 	user = jthodge
 [forge]
 	remote = origin
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true    # use n and N to move between diff sections
+    light = false      # set to true if you're in a terminal w/ a light background color (e.g. the default macOS terminal)
+[merge]
+    conflictstyle = diff3
+[diff]
+    colorMoved = default
