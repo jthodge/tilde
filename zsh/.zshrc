@@ -2,6 +2,10 @@
 # Configuration located at tilde/zsh/.spaceshiprc.zsh
 source "/usr/local/opt/spaceship/spaceship.zsh"
 
+# Configure z navigation
+# https://github.com/rupa/z
+. ~/z/z.sh
+
 # Remove duplicate history when reverse-searching commands
 # TODO: relocate env vars to .zshenv
 # TODO: relocate all zsh dotfiles to tilde/zsh/
