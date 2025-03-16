@@ -75,4 +75,3 @@ SPACESHIP_HOST_SHOW=always
 
 # Display un-truncated path in git repos
 SPACESHIP_DIR_TRUNC_REPO=false
-

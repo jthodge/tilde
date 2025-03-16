@@ -1,0 +1,22 @@
+# Terminal
+
+## Spaceship Prompt
+source /opt/homebrew/opt/spaceship/spaceship.zsh
+
+# Development Tooling
+
+## Python
+
+### Pyenv
+export PYENV_ROOT="${HOME}/.pyenv"
+if command -v pyenv > /dev/null; then
+  eval "$(pyenv init --path)";
+  eval "$(pyenv init -)";
+  pyenv virtualenvwrapper_lazy;
+fi
+
+## JavaScript
+
+### Volta
+export VOLTA_HOME="${HOME}/.volta"
+export PATH="${VOLTA_HOME}/bin:${PATH}"
