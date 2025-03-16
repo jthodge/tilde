@@ -1,5 +1,11 @@
 # Terminal
 
+## Prevent `complete:13: command not found: compdef`
+## https://stackoverflow.com/questions/66338988/complete13-command-not-found-compdef
+## TODO: resolve without this autoload
+autoload -Uz compinit
+compinit
+
 ## bat (https://github.com/sharkdp/bat)
 alias cat=bat
 
@@ -42,14 +48,8 @@ export PATH="${VOLTA_HOME}/bin:${PATH}"
 
 ## Python
 
-### Pyenv
-export PYENV_ROOT="${HOME}/.pyenv"
-export PYENV_VIRTUALENVWRAPPER_PREFER_PYVENV="true"
-if command -v pyenv > /dev/null; then
-  eval "$(pyenv init --path)";
-  eval "$(pyenv init -)";
-  pyenv virtualenvwrapper_lazy;
-fi
+### uv
+eval "$(uv generate-shell-completion zsh)"
 
 ## Zig
 export PATH=$PATH:/opt/homebrew/opt/zig
@@ -68,3 +68,4 @@ export PATH=$PATH:/opt/homebrew/opt/zig
 
 ## zoxide (https://github.com/ajeetdsouza/zoxide)
 eval "$(zoxide init zsh)"
+
