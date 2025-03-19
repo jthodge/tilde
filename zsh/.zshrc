@@ -27,6 +27,9 @@ source /opt/homebrew/opt/spaceship/spaceship.zsh
 ## fzf  (https://github.com/junegunn/fzf)
 source <(fzf --zsh)
 
+## zoxide (https://github.com/ajeetdsouza/zoxide)
+eval "$(zoxide init zsh)"
+
 # Development Tooling
 
 # C
@@ -58,14 +61,7 @@ export PATH=$PATH:/opt/homebrew/opt/zig
 
 ## ngrok
 
-# 2024-08-30: ngrok autocompletion returns errors:
-# (eval):2: command not found: compdef
-# (eval):213: command not found: compdef
-
-# if command -v ngrok > /dev/null; then
-#   eval "$(ngrok completion)"
-# fi
-
-## zoxide (https://github.com/ajeetdsouza/zoxide)
-eval "$(zoxide init zsh)"
+if command -v ngrok > /dev/null; then
+    eval "$(ngrok completion)"
+fi
 
