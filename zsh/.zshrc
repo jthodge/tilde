@@ -32,30 +32,43 @@ eval "$(zoxide init zsh)"
 
 # Development Tooling
 
-# C
+## C
 
-# Compiler
+### Compiler
 alias gcc=/opt/homebrew/bin/gcc-14
 # alias gcc=/usr/bin/gcc
 
-# Haskell
+## Haskell
 
-## GHCup
+### GHCup
 [ -f "/Users/jth/.ghcup/env" ] && . "/Users/jth/.ghcup/env"
-
-## JavaScript
-
-### Volta
-export VOLTA_HOME="${HOME}/.volta"
-export PATH="${VOLTA_HOME}/bin:${PATH}"
 
 ## Python
 
 ### uv
 eval "$(uv generate-shell-completion zsh)"
 
-## Zig
-export PATH=$PATH:/opt/homebrew/opt/zig
+# Ensures:
+# 1. A default venv (`base`) is always active if no other venv is active
+# 2. `pip` is aliased to `uv pip`
+# 3. Util function `activate` is provided to deactivate an existing venv before
+# activating a new venv
+export UV_DEFAULT_VENV="base"
+if [ -z "$VIRTUAL_ENV" ]; then  # Only activate if no venv is currently active
+    if [ ! -d "$HOME/.venv/$UV_DEFAULT_VENV" ]; then
+        uv venv "$HOME/.venv/$UV_DEFAULT_VENV"
+    fi
+    source "$HOME/.venv/$UV_DEFAULT_VENV/bin/activate"
+fi
+
+alias pip="uv pip"
+
+function activate() {
+    if [ -n "$VIRTUAL_ENV" ]; then
+        deactivate
+    fi
+    source "$1/bin/activate"
+}
 
 # Networking
 
