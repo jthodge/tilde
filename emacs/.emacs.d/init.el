@@ -167,6 +167,161 @@
 ;; Configure hooks after `python-mode` is loaded
 (add-hook 'python-mode-hook #'set-up-python-env)
 
+(defun uv-activate ()
+  "Activate Python environment managed by uv based on current project directory.
+Looks for .venv directory in project root and activates the Python interpreter.
+Falls back to $HOME/.venv if no project-specific environment is found."
+  (interactive)
+  (let* ((project-root (project-root (project-current t)))
+         (project-venv-path (expand-file-name ".venv" project-root))
+         (home-dir (getenv "HOME"))
+         (home-venv-path (expand-file-name ".venv" home-dir))
+         ;; Check for various possible Python executable locations
+         (possible-python-paths '("bin/python" "bin/python3"
+                                 "base/bin/python" "base/bin/python3"))
+         (find-python-in-venv (lambda (venv-path)
+                                (when (file-directory-p venv-path)
+                                  (seq-find (lambda (exec-path)
+                                             (let ((full-path (expand-file-name exec-path venv-path)))
+                                               (file-exists-p full-path)))
+                                           possible-python-paths))))
+         (project-python-rel-path (and (file-directory-p project-venv-path)
+                                      (funcall find-python-in-venv project-venv-path)))
+         (home-python-rel-path (and (file-directory-p home-venv-path)
+                                   (funcall find-python-in-venv home-venv-path)))
+         ;; Select venv path and python path
+         (selected-venv-path (cond
+                              ((and project-python-rel-path) project-venv-path)
+                              ((and home-python-rel-path) home-venv-path)
+                              (t nil)))
+         (selected-python-path (cond
+                                ((and project-python-rel-path)
+                                 (expand-file-name project-python-rel-path project-venv-path))
+                                ((and home-python-rel-path)
+                                 (expand-file-name home-python-rel-path home-venv-path))
+                                (t nil))))
+
+    ;; Debug output
+    (message "Project venv exists: %s" (file-directory-p project-venv-path))
+    (message "Home venv exists: %s" (file-directory-p home-venv-path))
+    (message "Project python path: %s"
+             (if project-python-rel-path
+                 (expand-file-name project-python-rel-path project-venv-path)
+               "not found"))
+    (message "Home python path: %s"
+             (if home-python-rel-path
+                 (expand-file-name home-python-rel-path home-venv-path)
+               "not found"))
+
+    (if (and selected-venv-path selected-python-path)
+        (progn
+          ;; Set Python interpreter path
+          (setq python-shell-interpreter selected-python-path)
+
+          ;; Update exec-path to include the venv's bin directory
+          (let ((venv-bin-dir (file-name-directory selected-python-path)))
+            (setq exec-path (cons venv-bin-dir
+                                  (remove venv-bin-dir exec-path))))
+
+          ;; Update PATH environment variable
+          (setenv "PATH" (concat (file-name-directory selected-python-path)
+                                 path-separator
+                                 (getenv "PATH")))
+
+          ;; Update VIRTUAL_ENV environment variable
+          (setenv "VIRTUAL_ENV" selected-venv-path)
+
+          ;; Remove PYTHONHOME if it exists
+          (setenv "PYTHONHOME" nil)
+
+          (message "Activated UV Python environment at %s (using %s)"
+                   selected-venv-path
+                   selected-python-path))
+      (error "No Python interpreter found in %s or %s venv directories" project-root home-dir))))
+
+(defun uv-deactivate ()
+  "Deactivate the current Python virtual environment.
+If a project-specific environment is active, deactivate it and
+fall back to $HOME/.venv if it exists.
+Otherwise, perform default deactivation behavior."
+  (interactive)
+  (let* ((current-virtual-env (getenv "VIRTUAL_ENV"))
+         (home-dir (getenv "HOME"))
+         (home-venv-path (expand-file-name ".venv" home-dir))
+         (home-venv-exists (file-directory-p home-venv-path))
+         ;; Possible Python paths in home venv
+         (possible-python-paths '("bin/python" "bin/python3"
+                                 "base/bin/python" "base/bin/python3"))
+         (find-python-in-venv (lambda (venv-path)
+                                (when (file-directory-p venv-path)
+                                  (seq-find (lambda (exec-path)
+                                             (let ((full-path (expand-file-name exec-path venv-path)))
+                                               (file-exists-p full-path)))
+                                           possible-python-paths))))
+         (home-python-rel-path (and home-venv-exists
+                                   (funcall find-python-in-venv home-venv-path)))
+         (home-python-path (when home-python-rel-path
+                             (expand-file-name home-python-rel-path home-venv-path))))
+
+    ;; First deactivate current environment if it exists
+    (when current-virtual-env
+      ;; Remove the virtual env's bin directories from exec-path
+      (when-let* ((bin-dir (expand-file-name "bin" current-virtual-env)))
+        (setq exec-path (remove bin-dir exec-path)))
+      (when-let* ((base-bin-dir (expand-file-name "base/bin" current-virtual-env)))
+        (setq exec-path (remove base-bin-dir exec-path)))
+
+      ;; Remove the bin directories from PATH environment variable
+      (let ((path-elements (split-string (getenv "PATH") path-separator))
+            (bin-dir (expand-file-name "bin" current-virtual-env))
+            (base-bin-dir (expand-file-name "base/bin" current-virtual-env)))
+        (setenv "PATH"
+                (mapconcat 'identity
+                           (seq-filter (lambda (path)
+                                         (not (or (string= path bin-dir)
+                                                  (string= path base-bin-dir))))
+                                      path-elements)
+                           path-separator)))
+
+      ;; Reset Python interpreter to the system default temporarily
+      (setq python-shell-interpreter "python")
+
+      ;; Unset VIRTUAL_ENV environment variable
+      (setenv "VIRTUAL_ENV" nil)
+
+      (message "Deactivated virtual environment: %s" current-virtual-env))
+
+    ;; Now activate home venv if it exists and has a Python interpreter
+    (if (and home-venv-exists home-python-path)
+        (progn
+          ;; Set Python interpreter path
+          (setq python-shell-interpreter home-python-path)
+
+          ;; Update exec-path to include the home venv's bin directory
+          (let ((venv-bin-dir (file-name-directory home-python-path)))
+            (setq exec-path (cons venv-bin-dir
+                                  (remove venv-bin-dir exec-path))))
+
+          ;; Update PATH environment variable
+          (setenv "PATH" (concat (file-name-directory home-python-path)
+                                 path-separator
+                                 (getenv "PATH")))
+
+          ;; Update VIRTUAL_ENV environment variable
+          (setenv "VIRTUAL_ENV" home-venv-path)
+
+          ;; Remove PYTHONHOME if it exists
+          (setenv "PYTHONHOME" nil)
+
+          (message "Activated fallback UV Python environment at %s" home-venv-path))
+
+      ;; No home venv or no Python in home venv
+      (unless current-virtual-env  ; Only show if we weren't deactivating something
+        (message "No active virtual environment to deactivate."))))
+
+  ;; Return nil to indicate function completed
+  nil)
+
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
