@@ -66,4 +66,3 @@ cask "vlc"
 cask "wireshark"
 cask "zoom"
 mas "Things", id: 904280696
-mas "Xcode", id: 497799835
