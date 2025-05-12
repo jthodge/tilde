@@ -1,4 +1,4 @@
-;; init.el
+;; init.el  -*- lexical-binding: t; -*-
 
 ;; Configure UI
 (menu-bar-mode 0)
@@ -8,6 +8,8 @@
 (setq inhibit-startup-screen t)
 (column-number-mode)
 (global-display-line-numbers-mode)
+(if (version<= "29" emacs-version)
+    (pixel-scroll-precision-mode 1))
 
 ;; Configure Theme
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
@@ -70,6 +72,11 @@
           (unless (package-installed-p package)
             (package-install package)))
       my-packages)
+
+;; OCaml
+(add-to-list 'load-path "/Users/jth/.opam/default/share/emacs/site-lisp")
+(require 'ocp-indent)
+
 
 ;; Set standard action keymaps
 ;; N.B. These prevent conflicts with `lsp-mode` keymaps
@@ -340,3 +347,6 @@ Otherwise, perform default deactivation behavior."
  ;; If there is more than one, they won't work right.
  )
 
+;; ## added by OPAM user-setup for emacs / base ## 56ab50dc8996d2bb95e7856a6eddb17b ## you can edit, but keep this line
+(require 'opam-user-setup "~/.emacs.d/opam-user-setup.el")
+;; ## end of OPAM user-setup addition for emacs / base ## keep this line
