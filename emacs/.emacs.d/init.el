@@ -1,61 +1,71 @@
 ;; init.el  -*- lexical-binding: t; -*-
 
-;; Load scripts
+;;; ================================================================
+;;; BOOTSTRAP
+;;; ================================================================
+
 (load "~/.emacs.d/scripts.el")
 
-;; Configure UI
+;;; ================================================================
+;;; CORE UI CONFIGURATION
+;;; ================================================================
+
+;; Basic UI cleanup
 (menu-bar-mode 0)
+(setq inhibit-startup-screen t)
+(column-number-mode)
+(global-display-line-numbers-mode)
+
+;; GUI-specific settings
 (when (display-graphic-p)
   (add-to-list 'default-frame-alist '(undecorated . t))
   (tool-bar-mode 0)
   (scroll-bar-mode 0))
-(setq inhibit-startup-screen t)
-(column-number-mode)
-(global-display-line-numbers-mode)
-(if (version<= "29" emacs-version)
-    (pixel-scroll-precision-mode 1))
 
-;; Configure Theme
+;; Modern scrolling for Emacs 29+
+(when (version<= "29" emacs-version)
+  (pixel-scroll-precision-mode 1))
+
+;; Theme and font
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 (load-theme 'ujelly t)
 
-;; Configure Font
 (when (member "Berkeley Mono" (font-family-list))
   (set-frame-font "Berkeley Mono" t t))
 
-;; Minibuffer Completion
+;;; ================================================================
+;;; EDITING BEHAVIOR
+;;; ================================================================
+
+;; Whitespace and indentation
+(setq-default show-trailing-whitespace t
+              indicate-empty-lines 1
+              indicate-buffer-boundaries 'left
+              indent-tabs-mode nil
+              tab-width 4
+              require-final-newline t)
+
+;; Text formatting
+(setq sentence-end-double-space nil)
+
+;; Parentheses highlighting
+(setq show-paren-delay 0)
+(show-paren-mode 1)
+
+;; Completion
 (ido-mode 1)
 (ido-everywhere)
 (setq ido-enable-flex-matching t)
 (fido-mode)
 
-;; Handle Whitespace
-(setq-default show-trailing-whitespace t)
-(setq-default indicate-empty-lines 1)
-(setq-default indicate-buffer-boundaries 'left)
+;;; ================================================================
+;;; PACKAGE MANAGEMENT
+;;; ================================================================
 
-;; Single-spaced Sentences
-(setq sentence-end-double-space nil)
-
-;; Spaced Indentation
-(setq-default indent-tabs-mode nil)
-
-;; Tab Stop Distance
-(setq-default tab-width 4)
-
-;; Create POSIX-defined Line on Save
-;; https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_206
-(setq-default require-final-newline t)
-
-;; Highlight Parentheses
-(setq show-paren-delay 0)
-(show-paren-mode 1)
-
-;; Package Support
 (require 'package)
-(add-to-list 'package-archives
-             '("melpa" . "https://melpa.org/packages/") t)
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
+
 (when (not package-archive-contents)
   (package-refresh-contents))
 
@@ -73,179 +83,182 @@
     yasnippet              ; Snippet and template management
     ))
 
-(mapc #'(lambda (package)
-          (unless (package-installed-p package)
-            (package-install package)))
+(mapc (lambda (package)
+        (unless (package-installed-p package)
+          (package-install package)))
       my-packages)
 
-;; OCaml
-(add-to-list 'load-path "/Users/jth/.opam/default/share/emacs/site-lisp")
-(require 'ocp-indent)
+;;; ================================================================
+;;; DEVELOPMENT TOOLS - GENERAL
+;;; ================================================================
 
-
-;; Set standard action keymaps
-;; N.B. These prevent conflicts with `lsp-mode` keymaps
-(global-set-key (kbd "C-c o l") #'org-store-link)
-(global-set-key (kbd "C-c o b") #'org-switchb)
-
-;; Text Completion
+;; Company (text completion)
 (require 'company)
-(setopt company-idle-delay 0.1)
-(setopt company-tooltip-align-annotations t)
-(defmacro company-backend-for-hook (hook backends)
+(setopt company-idle-delay 0.1
+        company-tooltip-align-annotations t)
+
+(defmacro my/company-backend-for-hook (hook backends)
+  "Set BACKENDS for company completion on HOOK."
   `(add-hook ,hook (lambda ()
                      (set (make-local-variable 'company-backends)
                           ,backends))))
 
-;; Snippets and template expansion
+;; Snippets
 (with-eval-after-load 'yasnippet
   (yas-reload-all))
 
-;; LSP
-;; Set `lsp-mode` keymap prefix
-(setopt lsp-keymap-prefix "C-c l")
-;; Shut down LSP server when all buffers associated with the server are closed
-(setopt lsp-keep-workspace-alive nil)
-;; Configure breadcrumbs
-(setopt lsp-headerline-breadcrumb-segments
-        '(path-up-to-project
-          file
-          symbols))
-;; Set delay for `lsp-ui` doc overlay
-(setopt lsp-ui-doc-delay 0.5)
-;; Set `lsp-mode` to use `flycheck` (instead of `flymake`) as diagnostics provider
-(setopt lsp-diagnostics-provider :flycheck)
+;; LSP Mode configuration
+(setopt lsp-keymap-prefix "C-c l"
+        lsp-keep-workspace-alive nil
+        lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols)
+        lsp-ui-doc-delay 0.5
+        lsp-diagnostics-provider :flycheck)
 
+;; LSP UI key remapping
 (with-eval-after-load 'lsp-ui
-  ;; Map `xref-find-definitions` (Default: `M-.`)
-  (define-key lsp-ui-mode-map
-              [remap xref-find-definitions]
-              #'lsp-ui-peek-find-definitions)
+  (define-key lsp-ui-mode-map [remap xref-find-definitions] #'lsp-ui-peek-find-definitions)
+  (define-key lsp-ui-mode-map [remap xref-find-references] #'lsp-ui-peek-find-references))
 
-  ;; Map `xref-find-references` (Default: `M-?`)
-  (define-key lsp-ui-mode-map
-              [remap xref-find-references]
-              #'lsp-ui-peek-find-references))
-
-;; Configure `lsp-mode` enhancements
+;; LSP Mode enhancements
 (with-eval-after-load 'lsp-mode
-  ;; Remap `lsp-treemacs-errors-list` to `C-c l g e`
-  (define-key lsp-mode-map
-              [remap lsp-treemacs-errors-list]
-              #'consult-lsp-diagnostics)
-  ;; Remap `xref-find-apropos` to `C-c l g a`
+  (define-key lsp-mode-map [remap lsp-treemacs-errors-list] #'consult-lsp-diagnostics)
   (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols)
-  ;; Enable `which-key-mode` `lsp-mode` integration
   (add-hook 'lsp-mode-hook #'lsp-enable-which-key-integration))
 
-;; Configure debugging
+;; Debug Adapter Protocol
 (setopt dap-auto-configure-mode t)
 
-(defmacro company-backend-for-hook (hook backends)
-  `(add-hook ,hook (lambda ()
-                     (set (make-local-variable 'company-backends)
-                          ,backends))))
+;;; ================================================================
+;;; KEYBINDINGS
+;;; ================================================================
 
-;; Python
-;; Load `python` mode when openin Python files
+;; Org mode keybindings (prevent conflicts with lsp-mode)
+(global-set-key (kbd "C-c o l") #'org-store-link)
+(global-set-key (kbd "C-c o b") #'org-switchb)
+
+;;; ================================================================
+;;; TREE-SITTER CONFIGURATION
+;;; ================================================================
+
+(defun my/setup-treesitter-grammars ()
+  "Install Tree-sitter grammars if they're absent."
+  (interactive)
+  (when (and (fboundp 'treesit-install-language-grammar)
+             (boundp 'treesit-language-source-alist))
+    (let ((grammars '((javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
+                      (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
+                      (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
+                      (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src")))))
+      (dolist (grammar grammars)
+        (add-to-list 'treesit-language-source-alist grammar)
+        (condition-case err
+            (unless (treesit-language-available-p (car grammar))
+              (treesit-install-language-grammar (car grammar)))
+          (error
+           (message "Failed to install tree-sitter grammar for %s: %s" (car grammar) err)))))))
+
+(defun my/setup-treesitter-mode-remapping ()
+  "Configure major mode remapping for tree-sitter modes."
+  (when (and (fboundp 'treesit-available-p)
+             (boundp 'major-mode-remap-alist))
+    (let ((mode-mappings '((typescript-mode . typescript-ts-mode)
+                          (js-mode . typescript-ts-mode)
+                          (js2-mode . typescript-ts-mode)
+                          (json-mode . json-ts-mode)
+                          (js-json-mode . json-ts-mode))))
+      (dolist (mapping mode-mappings)
+        (add-to-list 'major-mode-remap-alist mapping)))))
+
+(defun my/setup-treesitter-auto-modes ()
+  "Configure file associations for tree-sitter modes."
+  (when (fboundp 'treesit-available-p)
+    (let ((file-associations '(("\\.tsx\\'" . tsx-ts-mode)
+                              ("\\.js\\'" . typescript-ts-mode)
+                              ("\\.mjs\\'" . typescript-ts-mode)
+                              ("\\.mts\\'" . typescript-ts-mode)
+                              ("\\.cjs\\'" . typescript-ts-mode)
+                              ("\\.ts\\'" . typescript-ts-mode)
+                              ("\\.jsx\\'" . tsx-ts-mode)
+                              ("\\.json\\'" . json-ts-mode)
+                              ("\\.Dockerfile\\'" . dockerfile-ts-mode))))
+      (dolist (association file-associations)
+        (add-to-list 'auto-mode-alist association)))))
+
+;; Initialize tree-sitter
+(when (and (fboundp 'treesit-available-p) (treesit-available-p))
+  (my/setup-treesitter-grammars)
+  (my/setup-treesitter-mode-remapping)
+  (my/setup-treesitter-auto-modes))
+
+;;; ================================================================
+;;; LANGUAGE SUPPORT - PYTHON
+;;; ================================================================
+
 (add-to-list 'auto-mode-alist '("\\.py\\'" . python-mode))
-
-;; Set indentation
 (setq python-indent-offset 4)
 
-(defun set-up-python-env ()
-  "Set up Python development environment in current buffer."
-  (company-backend-for-hook 'lsp-completion-mode-hook
-                        '((company-capf :with company-yasnippet)
-                          company-dabbrev-code))
-
-  ;; Enable LSP support in Python buffers
+(defun my/setup-python-development ()
+  "Configure Python development environment for current buffer."
+  (my/company-backend-for-hook 'lsp-completion-mode-hook
+                               '((company-capf :with company-yasnippet)
+                                 company-dabbrev-code))
   (require 'lsp-pyright)
-
-  ;; Start LSP server when switching to buffer
   (lsp-deferred)
-
-  ;; Enable yasnippet minor mode only in python-mode
   (yas-minor-mode 1)
-
-  ;; Find and set appropriate Python executable
   (setq-local python-shell-interpreter (executable-find "python"))
-
-  ;; Enable DAP support in Python buffers
   (require 'dap-python)
   (setq-local dap-python-debugger 'debugpy)
   (dap-mode 1))
 
-;; Configure hooks after `python-mode` is loaded
-(add-hook 'python-mode-hook #'set-up-python-env)
+(add-hook 'python-mode-hook #'my/setup-python-development)
 
-;; Tree-sitter Configuration
-(defun setup-treesitter-grammars ()
-  "Install Tree-sitter grammars if they are absent."
-  (interactive)
-  (when (fboundp 'treesit-install-language-grammar)
-    ;; Focus on TypeScript/JavaScript grammars for now
-    (dolist (grammar
-             '((javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
-               (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
-               (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
-               (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))))
-      (add-to-list 'treesit-language-source-alist grammar)
-      ;; Install grammar with error handling
-      (condition-case err
-          (unless (treesit-language-available-p (car grammar))
-            (treesit-install-language-grammar (car grammar)))
-        (error
-         (message "Failed to install tree-sitter grammar for %s: %s" (car grammar) err)))))
+;;; ================================================================
+;;; LANGUAGE SUPPORT - TYPESCRIPT/JAVASCRIPT
+;;; ================================================================
 
-  ;; Configure major mode remapping for tree-sitter modes  
-  (when (fboundp 'treesit-available-p)
-    (dolist (mapping
-             '((typescript-mode . typescript-ts-mode)
-               (js-mode . typescript-ts-mode)
-               (js2-mode . typescript-ts-mode)
-               (json-mode . json-ts-mode)
-               (js-json-mode . json-ts-mode)))
-      (add-to-list 'major-mode-remap-alist mapping))))
-
-;; Configure file associations for tree-sitter modes
-(when (fboundp 'treesit-available-p)
-  (add-to-list 'auto-mode-alist '("\\.tsx\\'" . tsx-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.js\\'" . typescript-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.mjs\\'" . typescript-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.mts\\'" . typescript-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.cjs\\'" . typescript-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.ts\\'" . typescript-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.jsx\\'" . tsx-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.json\\'" . json-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.Dockerfile\\'" . dockerfile-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.prisma\\'" . prisma-ts-mode)))
-
-;; Initialize tree-sitter when Emacs starts
-(when (and (fboundp 'treesit-available-p) (treesit-available-p))
-  (setup-treesitter-grammars))
-
-;; TypeScript/JavaScript Configuration
-(defun set-up-typescript-env ()
-  "Set up TypeScript/JavaScript development environment in current buffer."
-  (company-backend-for-hook 'lsp-completion-mode-hook
-                            '((company-capf :with company-yasnippet)
-                              company-dabbrev-code))
-
-  ;; Enable LSP support in TypeScript/JavaScript buffers
+(defun my/setup-typescript-development ()
+  "Configure TypeScript/JavaScript development environment for current buffer."
+  (my/company-backend-for-hook 'lsp-completion-mode-hook
+                               '((company-capf :with company-yasnippet)
+                                 company-dabbrev-code))
   (lsp-deferred)
-
-  ;; Enable yasnippet minor mode
   (yas-minor-mode 1)
-
-  ;; Enable DAP support for TypeScript/JavaScript
   (when (fboundp 'dap-mode)
     (dap-mode 1)))
 
-;; Configure hooks for TypeScript/JavaScript modes
-(add-hook 'typescript-ts-mode-hook #'set-up-typescript-env)
-(add-hook 'tsx-ts-mode-hook #'set-up-typescript-env)
-(add-hook 'typescript-mode-hook #'set-up-typescript-env)
+(add-hook 'typescript-ts-mode-hook #'my/setup-typescript-development)
+(add-hook 'tsx-ts-mode-hook #'my/setup-typescript-development)
+(add-hook 'typescript-mode-hook #'my/setup-typescript-development)
+
+;;; ================================================================
+;;; LANGUAGE SUPPORT - OCAML
+;;; ================================================================
+
+(add-to-list 'load-path "/Users/jth/.opam/default/share/emacs/site-lisp")
+(require 'ocp-indent)
+
+;;; ================================================================
+;;; UV PYTHON ENVIRONMENT MANAGEMENT
+;;; ================================================================
+
+(defun my/find-python-in-venv (venv-path)
+  "Find Python executable in VENV-PATH, returning relative path or nil."
+  (when (file-directory-p venv-path)
+    (let ((possible-paths '("bin/python" "bin/python3" "base/bin/python" "base/bin/python3")))
+      (seq-find (lambda (exec-path)
+                  (file-exists-p (expand-file-name exec-path venv-path)))
+                possible-paths))))
+
+(defun my/activate-venv (venv-path python-rel-path)
+  "Activate virtual environment at VENV-PATH with PYTHON-REL-PATH."
+  (let ((python-path (expand-file-name python-rel-path venv-path)))
+    (setq python-shell-interpreter python-path)
+    (let ((venv-bin-dir (file-name-directory python-path)))
+      (setq exec-path (cons venv-bin-dir (remove venv-bin-dir exec-path))))
+    (setenv "PATH" (concat (file-name-directory python-path) path-separator (getenv "PATH")))
+    (setenv "VIRTUAL_ENV" venv-path)
+    (setenv "PYTHONHOME" nil)
+    (message "Activated UV Python environment at %s (using %s)" venv-path python-path)))
 
 (defun uv-activate ()
   "Activate Python environment managed by uv based on current project directory.
@@ -254,70 +267,33 @@ Falls back to $HOME/.venv if no project-specific environment is found."
   (interactive)
   (let* ((project-root (project-root (project-current t)))
          (project-venv-path (expand-file-name ".venv" project-root))
-         (home-dir (getenv "HOME"))
-         (home-venv-path (expand-file-name ".venv" home-dir))
-         ;; Check for various possible Python executable locations
-         (possible-python-paths '("bin/python" "bin/python3"
-                                 "base/bin/python" "base/bin/python3"))
-         (find-python-in-venv (lambda (venv-path)
-                                (when (file-directory-p venv-path)
-                                  (seq-find (lambda (exec-path)
-                                             (let ((full-path (expand-file-name exec-path venv-path)))
-                                               (file-exists-p full-path)))
-                                           possible-python-paths))))
-         (project-python-rel-path (and (file-directory-p project-venv-path)
-                                      (funcall find-python-in-venv project-venv-path)))
-         (home-python-rel-path (and (file-directory-p home-venv-path)
-                                   (funcall find-python-in-venv home-venv-path)))
-         ;; Select venv path and python path
-         (selected-venv-path (cond
-                              ((and project-python-rel-path) project-venv-path)
-                              ((and home-python-rel-path) home-venv-path)
-                              (t nil)))
-         (selected-python-path (cond
-                                ((and project-python-rel-path)
-                                 (expand-file-name project-python-rel-path project-venv-path))
-                                ((and home-python-rel-path)
-                                 (expand-file-name home-python-rel-path home-venv-path))
-                                (t nil))))
+         (home-venv-path (expand-file-name ".venv" (getenv "HOME")))
+         (project-python-rel-path (my/find-python-in-venv project-venv-path))
+         (home-python-rel-path (my/find-python-in-venv home-venv-path)))
 
-    ;; Debug output
-    (message "Project venv exists: %s" (file-directory-p project-venv-path))
-    (message "Home venv exists: %s" (file-directory-p home-venv-path))
-    (message "Project python path: %s"
-             (if project-python-rel-path
-                 (expand-file-name project-python-rel-path project-venv-path)
-               "not found"))
-    (message "Home python path: %s"
-             (if home-python-rel-path
-                 (expand-file-name home-python-rel-path home-venv-path)
-               "not found"))
+    (cond
+     (project-python-rel-path
+      (my/activate-venv project-venv-path project-python-rel-path))
+     (home-python-rel-path
+      (my/activate-venv home-venv-path home-python-rel-path))
+     (t
+      (error "No Python interpreter found in %s or %s venv directories" project-root (getenv "HOME"))))))
 
-    (if (and selected-venv-path selected-python-path)
-        (progn
-          ;; Set Python interpreter path
-          (setq python-shell-interpreter selected-python-path)
-
-          ;; Update exec-path to include the venv's bin directory
-          (let ((venv-bin-dir (file-name-directory selected-python-path)))
-            (setq exec-path (cons venv-bin-dir
-                                  (remove venv-bin-dir exec-path))))
-
-          ;; Update PATH environment variable
-          (setenv "PATH" (concat (file-name-directory selected-python-path)
-                                 path-separator
-                                 (getenv "PATH")))
-
-          ;; Update VIRTUAL_ENV environment variable
-          (setenv "VIRTUAL_ENV" selected-venv-path)
-
-          ;; Remove PYTHONHOME if it exists
-          (setenv "PYTHONHOME" nil)
-
-          (message "Activated UV Python environment at %s (using %s)"
-                   selected-venv-path
-                   selected-python-path))
-      (error "No Python interpreter found in %s or %s venv directories" project-root home-dir))))
+(defun my/deactivate-current-venv ()
+  "Deactivate current virtual environment."
+  (when-let ((current-venv (getenv "VIRTUAL_ENV")))
+    (let ((bin-dir (expand-file-name "bin" current-venv))
+          (base-bin-dir (expand-file-name "base/bin" current-venv)))
+      (setq exec-path (seq-remove (lambda (path) (or (string= path bin-dir) (string= path base-bin-dir))) exec-path))
+      (let ((path-elements (split-string (getenv "PATH") path-separator)))
+        (setenv "PATH" (mapconcat 'identity
+                                 (seq-filter (lambda (path)
+                                              (not (or (string= path bin-dir) (string= path base-bin-dir))))
+                                            path-elements)
+                                 path-separator))))
+    (setq python-shell-interpreter "python")
+    (setenv "VIRTUAL_ENV" nil)
+    (message "Deactivated virtual environment: %s" current-venv)))
 
 (defun uv-deactivate ()
   "Deactivate the current Python virtual environment.
@@ -325,82 +301,17 @@ If a project-specific environment is active, deactivate it and
 fall back to $HOME/.venv if it exists.
 Otherwise, perform default deactivation behavior."
   (interactive)
-  (let* ((current-virtual-env (getenv "VIRTUAL_ENV"))
-         (home-dir (getenv "HOME"))
-         (home-venv-path (expand-file-name ".venv" home-dir))
-         (home-venv-exists (file-directory-p home-venv-path))
-         ;; Possible Python paths in home venv
-         (possible-python-paths '("bin/python" "bin/python3"
-                                 "base/bin/python" "base/bin/python3"))
-         (find-python-in-venv (lambda (venv-path)
-                                (when (file-directory-p venv-path)
-                                  (seq-find (lambda (exec-path)
-                                             (let ((full-path (expand-file-name exec-path venv-path)))
-                                               (file-exists-p full-path)))
-                                           possible-python-paths))))
-         (home-python-rel-path (and home-venv-exists
-                                   (funcall find-python-in-venv home-venv-path)))
-         (home-python-path (when home-python-rel-path
-                             (expand-file-name home-python-rel-path home-venv-path))))
+  (let* ((home-venv-path (expand-file-name ".venv" (getenv "HOME")))
+         (home-python-rel-path (my/find-python-in-venv home-venv-path)))
 
-    ;; First deactivate current environment if it exists
-    (when current-virtual-env
-      ;; Remove the virtual env's bin directories from exec-path
-      (when-let* ((bin-dir (expand-file-name "bin" current-virtual-env)))
-        (setq exec-path (remove bin-dir exec-path)))
-      (when-let* ((base-bin-dir (expand-file-name "base/bin" current-virtual-env)))
-        (setq exec-path (remove base-bin-dir exec-path)))
+    (my/deactivate-current-venv)
 
-      ;; Remove the bin directories from PATH environment variable
-      (let ((path-elements (split-string (getenv "PATH") path-separator))
-            (bin-dir (expand-file-name "bin" current-virtual-env))
-            (base-bin-dir (expand-file-name "base/bin" current-virtual-env)))
-        (setenv "PATH"
-                (mapconcat 'identity
-                           (seq-filter (lambda (path)
-                                         (not (or (string= path bin-dir)
-                                                  (string= path base-bin-dir))))
-                                      path-elements)
-                           path-separator)))
+    (when (and (file-directory-p home-venv-path) home-python-rel-path)
+      (my/activate-venv home-venv-path home-python-rel-path))))
 
-      ;; Reset Python interpreter to the system default temporarily
-      (setq python-shell-interpreter "python")
-
-      ;; Unset VIRTUAL_ENV environment variable
-      (setenv "VIRTUAL_ENV" nil)
-
-      (message "Deactivated virtual environment: %s" current-virtual-env))
-
-    ;; Now activate home venv if it exists and has a Python interpreter
-    (if (and home-venv-exists home-python-path)
-        (progn
-          ;; Set Python interpreter path
-          (setq python-shell-interpreter home-python-path)
-
-          ;; Update exec-path to include the home venv's bin directory
-          (let ((venv-bin-dir (file-name-directory home-python-path)))
-            (setq exec-path (cons venv-bin-dir
-                                  (remove venv-bin-dir exec-path))))
-
-          ;; Update PATH environment variable
-          (setenv "PATH" (concat (file-name-directory home-python-path)
-                                 path-separator
-                                 (getenv "PATH")))
-
-          ;; Update VIRTUAL_ENV environment variable
-          (setenv "VIRTUAL_ENV" home-venv-path)
-
-          ;; Remove PYTHONHOME if it exists
-          (setenv "PYTHONHOME" nil)
-
-          (message "Activated fallback UV Python environment at %s" home-venv-path))
-
-      ;; No home venv or no Python in home venv
-      (unless current-virtual-env  ; Only show if we weren't deactivating something
-        (message "No active virtual environment to deactivate."))))
-
-  ;; Return nil to indicate function completed
-  nil)
+;;; ================================================================
+;;; CUSTOM SETTINGS
+;;; ================================================================
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
@@ -415,6 +326,7 @@ Otherwise, perform default deactivation behavior."
  '(package-selected-packages
    '(company consult-lsp dap-mode elfeed flycheck lsp-pyright lsp-ui
              typescript-mode yasnippet)))
+
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -422,6 +334,9 @@ Otherwise, perform default deactivation behavior."
  ;; If there is more than one, they won't work right.
  )
 
-;; ## added by OPAM user-setup for emacs / base ## 56ab50dc8996d2bb95e7856a6eddb17b ## you can edit, but keep this line
+;;; ================================================================
+;;; EXTERNAL INTEGRATIONS
+;;; ================================================================
+
+;; OPAM (OCaml Package Manager) integration
 (require 'opam-user-setup "~/.emacs.d/opam-user-setup.el")
-;; ## end of OPAM user-setup addition for emacs / base ## keep this line
