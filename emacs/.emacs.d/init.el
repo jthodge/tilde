@@ -1,8 +1,12 @@
 ;; init.el  -*- lexical-binding: t; -*-
 
+;; Load scripts
+(load "~/.emacs.d/scripts.el")
+
 ;; Configure UI
 (menu-bar-mode 0)
 (when (display-graphic-p)
+  (add-to-list 'default-frame-alist '(undecorated . t))
   (tool-bar-mode 0)
   (scroll-bar-mode 0))
 (setq inhibit-startup-screen t)
