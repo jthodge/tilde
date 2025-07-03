@@ -126,17 +126,10 @@
         (append lsp-file-watch-ignored-directories
                 '("[/\\\\]\\.Trash\\'"
                   "[/\\\\]\\.git\\'"
-                  "[/\\\\]\\.svn\\'"
-                  "[/\\\\]\\.hg\\'"
-                  "[/\\\\]CVS\\'"
-                  "[/\\\\]\\.bzr\\'"
-                  "[/\\\\]_darcs\\'"
-                  "[/\\\\]\\.tox\\'"
                   "[/\\\\]\\.venv\\'"
                   "[/\\\\]__pycache__\\'"
                   "[/\\\\]node_modules\\'"
-                  "[/\\\\]\\.DS_Store\\'"
-                  "[/\\\\]Thumbs\\.db\\'"))))
+                  "[/\\\\]\\.DS_Store\\'"))))
 
 ;; LSP UI key remapping
 (with-eval-after-load 'lsp-ui
@@ -169,10 +162,22 @@
   (interactive)
   (when (and (fboundp 'treesit-install-language-grammar)
              (boundp 'treesit-language-source-alist))
-    (let ((grammars '((javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
+    (let ((grammars '((c "https://github.com/tree-sitter/tree-sitter-c")
+                      (cmake "https://github.com/uyha/tree-sitter-cmake")
+                      (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
+                      (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
+                      (elisp "https://github.com/Wilfred/tree-sitter-elisp")
+                      (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
+                      (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
                       (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
+                      ;; TODO: confirm smooth dovetail with existing python lang support
+                      ;; (python . ("https://github.com/tree-sitter/tree-sitter-python" "v0.20.4"))
+                      (make "https://github.com/alemuller/tree-sitter-make")
+                      (markdown "https://github.com/ikatyang/tree-sitter-markdown")
+                      (toml "https://github.com/tree-sitter/tree-sitter-toml")
                       (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
-                      (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src")))))
+                      (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))
+                      (yaml . ("https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0")))))
       (dolist (grammar grammars)
         (add-to-list 'treesit-language-source-alist grammar)
         (condition-case err
@@ -185,6 +190,7 @@
   "Configure major mode remapping for tree-sitter modes."
   (when (and (fboundp 'treesit-available-p)
              (boundp 'major-mode-remap-alist))
+    ;; TODO: complete mode remappings
     (let ((mode-mappings '((typescript-mode . typescript-ts-mode)
                           (js-mode . typescript-ts-mode)
                           (js2-mode . typescript-ts-mode)
@@ -196,6 +202,7 @@
 (defun my/setup-treesitter-auto-modes ()
   "Configure file associations for tree-sitter modes."
   (when (fboundp 'treesit-available-p)
+    ;; TODO: complete file associations
     (let ((file-associations '(("\\.tsx\\'" . tsx-ts-mode)
                               ("\\.js\\'" . typescript-ts-mode)
                               ("\\.mjs\\'" . typescript-ts-mode)
