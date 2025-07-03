@@ -43,6 +43,17 @@ alias gcc=/opt/homebrew/bin/gcc-14
 ### GHCup
 [ -f "/Users/jth/.ghcup/env" ] && . "/Users/jth/.ghcup/env"
 
+## OCaml
+
+### opam
+# BEGIN opam configuration
+# This is useful if you're using opam as it adds:
+#   - the correct directories to the PATH
+#   - auto-completion for the opam binary
+# This section can be safely removed at any time if needed.
+[[ ! -r '/Users/jth/.opam/opam-init/init.zsh' ]] || source '/Users/jth/.opam/opam-init/init.zsh' > /dev/null 2> /dev/null
+# END opam configuration
+
 ## Python
 
 ### uv
@@ -77,14 +88,6 @@ function activate() {
 if command -v ngrok > /dev/null; then
     eval "$(ngrok completion)"
 fi
-
-# BEGIN opam configuration
-# This is useful if you're using opam as it adds:
-#   - the correct directories to the PATH
-#   - auto-completion for the opam binary
-# This section can be safely removed at any time if needed.
-[[ ! -r '/Users/jth/.opam/opam-init/init.zsh' ]] || source '/Users/jth/.opam/opam-init/init.zsh' > /dev/null 2> /dev/null
-# END opam configuration
 
 # Agents
 
