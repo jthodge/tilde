@@ -116,7 +116,27 @@
         lsp-keep-workspace-alive nil
         lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols)
         lsp-ui-doc-delay 0.5
-        lsp-diagnostics-provider :flycheck)
+        lsp-diagnostics-provider :flycheck
+        lsp-restart 'auto-restart
+        lsp-server-install-dir (expand-file-name "lsp-servers/" user-emacs-directory))
+
+;; Configure file watching after lsp-mode loads
+(with-eval-after-load 'lsp-mode
+  (setq lsp-file-watch-ignored-directories
+        (append lsp-file-watch-ignored-directories
+                '("[/\\\\]\\.Trash\\'"
+                  "[/\\\\]\\.git\\'"
+                  "[/\\\\]\\.svn\\'"
+                  "[/\\\\]\\.hg\\'"
+                  "[/\\\\]CVS\\'"
+                  "[/\\\\]\\.bzr\\'"
+                  "[/\\\\]_darcs\\'"
+                  "[/\\\\]\\.tox\\'"
+                  "[/\\\\]\\.venv\\'"
+                  "[/\\\\]__pycache__\\'"
+                  "[/\\\\]node_modules\\'"
+                  "[/\\\\]\\.DS_Store\\'"
+                  "[/\\\\]Thumbs\\.db\\'"))))
 
 ;; LSP UI key remapping
 (with-eval-after-load 'lsp-ui
