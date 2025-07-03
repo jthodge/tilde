@@ -4,6 +4,10 @@
 ;;; BOOTSTRAP
 ;;; ================================================================
 
+;; Suppress obsolete warnings from package dependencies
+;; N.B. Upstream `cl` is the offending dependency package
+(setq byte-compile-warnings '(not obsolete))
+
 (load "~/.emacs.d/scripts.el")
 
 ;;; ================================================================
