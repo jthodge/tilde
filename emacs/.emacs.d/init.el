@@ -68,6 +68,7 @@
     lsp-mode               ; Language Server Protocol support
     lsp-pyright            ; Language Server Protocol client using pyright Python Language Server
     lsp-ui                 ; UI improvements for `lsp-mode`
+    typescript-mode        ; TypeScript editing support (fallback for non-tree-sitter)
     which-key              ; Display currently available keybindings
     yasnippet              ; Snippet and template management
     ))
@@ -177,6 +178,74 @@
 
 ;; Configure hooks after `python-mode` is loaded
 (add-hook 'python-mode-hook #'set-up-python-env)
+
+;; Tree-sitter Configuration
+(defun setup-treesitter-grammars ()
+  "Install Tree-sitter grammars if they are absent."
+  (interactive)
+  (when (fboundp 'treesit-install-language-grammar)
+    ;; Focus on TypeScript/JavaScript grammars for now
+    (dolist (grammar
+             '((javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
+               (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
+               (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
+               (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))))
+      (add-to-list 'treesit-language-source-alist grammar)
+      ;; Install grammar with error handling
+      (condition-case err
+          (unless (treesit-language-available-p (car grammar))
+            (treesit-install-language-grammar (car grammar)))
+        (error
+         (message "Failed to install tree-sitter grammar for %s: %s" (car grammar) err)))))
+
+  ;; Configure major mode remapping for tree-sitter modes  
+  (when (fboundp 'treesit-available-p)
+    (dolist (mapping
+             '((typescript-mode . typescript-ts-mode)
+               (js-mode . typescript-ts-mode)
+               (js2-mode . typescript-ts-mode)
+               (json-mode . json-ts-mode)
+               (js-json-mode . json-ts-mode)))
+      (add-to-list 'major-mode-remap-alist mapping))))
+
+;; Configure file associations for tree-sitter modes
+(when (fboundp 'treesit-available-p)
+  (add-to-list 'auto-mode-alist '("\\.tsx\\'" . tsx-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.js\\'" . typescript-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.mjs\\'" . typescript-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.mts\\'" . typescript-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.cjs\\'" . typescript-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.ts\\'" . typescript-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.jsx\\'" . tsx-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.json\\'" . json-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.Dockerfile\\'" . dockerfile-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.prisma\\'" . prisma-ts-mode)))
+
+;; Initialize tree-sitter when Emacs starts
+(when (and (fboundp 'treesit-available-p) (treesit-available-p))
+  (setup-treesitter-grammars))
+
+;; TypeScript/JavaScript Configuration
+(defun set-up-typescript-env ()
+  "Set up TypeScript/JavaScript development environment in current buffer."
+  (company-backend-for-hook 'lsp-completion-mode-hook
+                            '((company-capf :with company-yasnippet)
+                              company-dabbrev-code))
+
+  ;; Enable LSP support in TypeScript/JavaScript buffers
+  (lsp-deferred)
+
+  ;; Enable yasnippet minor mode
+  (yas-minor-mode 1)
+
+  ;; Enable DAP support for TypeScript/JavaScript
+  (when (fboundp 'dap-mode)
+    (dap-mode 1)))
+
+;; Configure hooks for TypeScript/JavaScript modes
+(add-hook 'typescript-ts-mode-hook #'set-up-typescript-env)
+(add-hook 'tsx-ts-mode-hook #'set-up-typescript-env)
+(add-hook 'typescript-mode-hook #'set-up-typescript-env)
 
 (defun uv-activate ()
   "Activate Python environment managed by uv based on current project directory.
@@ -343,7 +412,9 @@ Otherwise, perform default deactivation behavior."
      "a4340c197a450c77c729cad236b5f3ca88aaf974e91a7af2d2e7ae7bb5f96720"
      "6b20d669fcbcd79c6d0f3db36a71af1b88763246d3550a0c361866adecb38a9e"
      default))
- '(package-selected-packages nil))
+ '(package-selected-packages
+   '(company consult-lsp dap-mode elfeed flycheck lsp-pyright lsp-ui
+             typescript-mode yasnippet)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
