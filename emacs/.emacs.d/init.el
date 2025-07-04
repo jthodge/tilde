@@ -8,6 +8,11 @@
 ;; N.B. Upstream `cl` is the offending dependency package
 (setq byte-compile-warnings '(not obsolete))
 
+;; Add cargo bin to exec-path for tools like emacs-lsp-booster
+(let ((cargo-bin (expand-file-name "~/.cargo/bin")))
+  (when (file-directory-p cargo-bin)
+    (add-to-list 'exec-path cargo-bin)))
+
 (load "~/.emacs.d/scripts.el")
 
 ;;; ================================================================
@@ -92,6 +97,81 @@
           (package-install package)))
       my-packages)
 
+;; Set lsp-use-plists after packages are available but before lsp-mode is loaded
+(with-eval-after-load 'lsp-protocol
+  (setq lsp-use-plists t))
+
+;; Also set it if lsp-protocol is already loaded
+(when (featurep 'lsp-protocol)
+  (setq lsp-use-plists t))
+
+;;; ================================================================
+;;; PERFORMANCE OPTIMIZATIONS
+;;; ================================================================
+
+;; Increase the amount of data Emacs reads from processes
+(setq read-process-output-max (* 1024 1024)) ;; 1mb
+
+;; Optimize garbage collection thresholds
+(setq gc-cons-threshold 100000000) ;; 100mb
+(setq gc-cons-percentage 0.5)
+
+;; Configure native compilation if available
+(when (and (fboundp 'native-comp-available-p) (native-comp-available-p))
+  (setq native-comp-async-report-warnings-errors nil))
+
+;; LSP Booster configuration - must be set before lsp-mode loads
+;; Enable plists for better performance (required for LSP Booster)
+;; IMPORTANT: This must be set before lsp-mode is loaded for the first time
+;; The environment variable must be set early
+(setenv "LSP_USE_PLISTS" "true")
+
+(defun my/lsp-booster-find-executable ()
+  "Find emacs-lsp-booster executable in common locations."
+  (or (executable-find "emacs-lsp-booster")
+      (let ((cargo-path (expand-file-name "~/.cargo/bin/emacs-lsp-booster")))
+        (when (file-executable-p cargo-path)
+          cargo-path))))
+
+;; Define advice functions for LSP Booster
+(defun lsp-booster--advice-json-parse (old-fn &rest args)
+  "Try to parse bytecode instead of json.
+This allows emacs-lsp-booster to work correctly with bytecode responses."
+  (or (when (equal (following-char) ?#)
+        (let ((bytecode (read (current-buffer))))
+          (when (byte-code-function-p bytecode)
+            (funcall bytecode))))
+      (apply old-fn args)))
+
+(defun lsp-booster--advice-final-command (old-fn cmd &optional test?)
+  "Prepend emacs-lsp-booster command to lsp CMD when appropriate."
+  (let ((orig-result (funcall old-fn cmd test?)))
+    (if (and (not test?)                                  ; Not a test run
+             (not (file-remote-p default-directory))      ; Not on remote
+             (or (and (boundp 'lsp-use-plists) lsp-use-plists) ; plists enabled
+                 (getenv "LSP_USE_PLISTS"))               ; or env var set
+             (not (functionp 'json-rpc-connection))       ; Not using json-rpc
+             (my/lsp-booster-find-executable))             ; Booster is available
+        (progn
+          ;; Resolve the command path if needed
+          (when-let ((command-from-exec-path (executable-find (car orig-result))))
+            (setcar orig-result command-from-exec-path))
+          (message "LSP Booster: Wrapping command %s" orig-result)
+          (cons (my/lsp-booster-find-executable) orig-result))
+      orig-result)))
+
+;; Apply the advice functions
+(with-eval-after-load 'lsp-mode
+  ;; Add JSON parsing advice
+  (advice-add (if (progn (require 'json nil t)
+                         (fboundp 'json-parse-buffer))
+                  'json-parse-buffer
+                'json-read)
+              :around #'lsp-booster--advice-json-parse)
+
+  ;; Add command wrapping advice
+  (advice-add 'lsp-resolve-final-command :around #'lsp-booster--advice-final-command))
+
 ;;; ================================================================
 ;;; DEVELOPMENT TOOLS - GENERAL
 ;;; ================================================================
@@ -118,7 +198,16 @@
         lsp-ui-doc-delay 0.5
         lsp-diagnostics-provider :flycheck
         lsp-restart 'auto-restart
-        lsp-server-install-dir (expand-file-name "lsp-servers/" user-emacs-directory))
+        lsp-server-install-dir (expand-file-name "lsp-servers/" user-emacs-directory)
+        ;; Performance tuning
+        lsp-idle-delay 0.5
+        lsp-log-io nil  ; Disable IO logging for performance (set to t for debugging)
+        lsp-completion-provider :none  ; Use company-capf
+        lsp-prefer-flymake nil  ; Use flycheck
+        lsp-enable-file-watchers nil  ; Disable file watchers for performance
+        lsp-enable-folding nil  ; Disable folding for performance
+        lsp-enable-text-document-color nil  ; Disable color info
+        lsp-enable-on-type-formatting nil)  ; Disable on-type formatting
 
 ;; Configure file watching after lsp-mode loads
 (with-eval-after-load 'lsp-mode
@@ -371,3 +460,4 @@ Otherwise, perform default deactivation behavior."
 
 ;; OPAM (OCaml Package Manager) integration
 (require 'opam-user-setup "~/.emacs.d/opam-user-setup.el")
+(load-file "~/.emacs.d/test-lsp-booster.el")
