@@ -79,7 +79,8 @@
   (package-refresh-contents))
 
 (defconst my-packages
-  '(cape                   ; Completion At Point Extensions for Corfu
+  '(apheleia               ; Asynchronous code formatting
+    cape                   ; Completion At Point Extensions for Corfu
     company                ; Code and text completion framework (legacy, will be phased out)
     consult                ; Incremental narrowing
     consult-lsp            ; Improve working between `consult` and `lsp-mode`
@@ -214,6 +215,54 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
   ;; If package is installed, require it to ensure it loads
   (require 'cape nil t))
 
+;; Apheleia (asynchronous code formatting)
+(when (package-installed-p 'apheleia)
+  (with-eval-after-load 'apheleia
+    ;; Basic configuration
+    (setopt apheleia-log-only-errors t          ; Only log errors, not all operations
+            apheleia-hide-log-buffers t         ; Hide log buffers by default
+            apheleia-formatters-respect-indent-level t) ; Respect buffer indentation
+    
+    ;; Configure Volta-managed formatters
+    (setf (alist-get 'prettier-volta apheleia-formatters)
+          '("/Users/jth/.volta/bin/prettier" 
+            "--stdin-filepath" filepath
+            (apheleia-formatters-locate-file ".prettierrc.js" ".prettierrc.json" ".prettierrc.yml" ".prettierrc.yaml" ".prettierrc")))
+    
+    (setf (alist-get 'eslint-volta apheleia-formatters)
+          '("/Users/jth/.volta/bin/eslint"
+            "--stdin-filename" filepath
+            "--fix-dry-run"
+            "--format" "json"
+            "--stdin"))
+    
+    ;; Configure mode associations for TypeScript/JavaScript files
+    (setf (alist-get 'typescript-ts-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'tsx-ts-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'typescript-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'js-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'js2-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'javascript-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'json-mode apheleia-mode-alist) 'prettier-volta)
+    (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'prettier-volta)
+    
+    ;; Key bindings for manual formatting
+    (global-set-key (kbd "C-c f") #'apheleia-format-buffer)
+    
+    ;; Enhanced configuration  
+    (setopt apheleia-remote-algorithm 'cancel) ; Disable formatting for remote buffers
+    
+    ;; Enable global mode
+    (apheleia-global-mode 1))
+
+  ;; Configure LSP to not format on save (let Apheleia handle it)
+  (with-eval-after-load 'lsp-mode
+    (setq lsp-enable-on-type-formatting nil
+          lsp-enable-indentation nil))
+  
+  ;; Load the package
+  (require 'apheleia nil t))
+
 ;; Company (fallback if Corfu is not available)
 (unless (package-installed-p 'corfu)
   (message "Corfu not available, falling back to Company mode")
@@ -323,10 +372,10 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
              (boundp 'major-mode-remap-alist))
     ;; TODO: complete mode remappings
     (let ((mode-mappings '((typescript-mode . typescript-ts-mode)
-                          (js-mode . typescript-ts-mode)
-                          (js2-mode . typescript-ts-mode)
-                          (json-mode . json-ts-mode)
-                          (js-json-mode . json-ts-mode))))
+                           (js-mode . typescript-ts-mode)
+                           (js2-mode . typescript-ts-mode)
+                           (json-mode . json-ts-mode)
+                           (js-json-mode . json-ts-mode))))
       (dolist (mapping mode-mappings)
         (add-to-list 'major-mode-remap-alist mapping)))))
 
@@ -335,14 +384,14 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
   (when (fboundp 'treesit-available-p)
     ;; TODO: complete file associations
     (let ((file-associations '(("\\.tsx\\'" . tsx-ts-mode)
-                              ("\\.js\\'" . typescript-ts-mode)
-                              ("\\.mjs\\'" . typescript-ts-mode)
-                              ("\\.mts\\'" . typescript-ts-mode)
-                              ("\\.cjs\\'" . typescript-ts-mode)
-                              ("\\.ts\\'" . typescript-ts-mode)
-                              ("\\.jsx\\'" . tsx-ts-mode)
-                              ("\\.json\\'" . json-ts-mode)
-                              ("\\.Dockerfile\\'" . dockerfile-ts-mode))))
+                               ("\\.js\\'" . typescript-ts-mode)
+                               ("\\.mjs\\'" . typescript-ts-mode)
+                               ("\\.mts\\'" . typescript-ts-mode)
+                               ("\\.cjs\\'" . typescript-ts-mode)
+                               ("\\.ts\\'" . typescript-ts-mode)
+                               ("\\.jsx\\'" . tsx-ts-mode)
+                               ("\\.json\\'" . json-ts-mode)
+                               ("\\.Dockerfile\\'" . dockerfile-ts-mode))))
       (dolist (association file-associations)
         (add-to-list 'auto-mode-alist association)))))
 
@@ -465,10 +514,10 @@ Falls back to $HOME/.venv if no project-specific environment is found."
       (setq exec-path (seq-remove (lambda (path) (or (string= path bin-dir) (string= path base-bin-dir))) exec-path))
       (let ((path-elements (split-string (getenv "PATH") path-separator)))
         (setenv "PATH" (mapconcat 'identity
-                                 (seq-filter (lambda (path)
-                                              (not (or (string= path bin-dir) (string= path base-bin-dir))))
-                                            path-elements)
-                                 path-separator))))
+                                  (seq-filter (lambda (path)
+                                                (not (or (string= path bin-dir) (string= path base-bin-dir))))
+                                              path-elements)
+                                  path-separator))))
     (setq python-shell-interpreter "python")
     (setenv "VIRTUAL_ENV" nil)
     (message "Deactivated virtual environment: %s" current-venv)))
@@ -520,3 +569,4 @@ Otherwise, perform default deactivation behavior."
 ;; Development testing utilities
 (load-file "~/.emacs.d/test-lsp-booster.el")
 (load-file "~/.emacs.d/test-corfu-migration.el")
+(load-file "~/.emacs.d/test-apheleia.el")
