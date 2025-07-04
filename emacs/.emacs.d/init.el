@@ -79,9 +79,11 @@
   (package-refresh-contents))
 
 (defconst my-packages
-  '(company                ; Code and text completion framework
+  '(cape                   ; Completion At Point Extensions for Corfu
+    company                ; Code and text completion framework (legacy, will be phased out)
     consult                ; Incremental narrowing
     consult-lsp            ; Improve working between `consult` and `lsp-mode`
+    corfu                  ; Modern completion frontend
     dap-mode               ; Debug Adapter Protocol Support
     flycheck               ; Linting and syntax checker
     lsp-mode               ; Language Server Protocol support
@@ -94,7 +96,10 @@
 
 (mapc (lambda (package)
         (unless (package-installed-p package)
-          (package-install package)))
+          (condition-case err
+              (package-install package)
+            (error
+             (message "Failed to install package %s: %s" package err)))))
       my-packages)
 
 ;; Set lsp-use-plists after packages are available but before lsp-mode is loaded
@@ -176,11 +181,48 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 ;;; DEVELOPMENT TOOLS - GENERAL
 ;;; ================================================================
 
-;; Company (text completion)
-(require 'company)
-(setopt company-idle-delay 0.1
-        company-tooltip-align-annotations t)
+;; Corfu (modern completion framework)
+(when (package-installed-p 'corfu)
+  (with-eval-after-load 'corfu
+    (setopt corfu-cycle t           ; Enable cycling for `corfu-next/previous'
+            corfu-auto t            ; Enable auto completion
+            corfu-auto-delay 0.1    ; Auto completion delay
+            corfu-auto-prefix 1     ; Minimum prefix length for auto completion
+            corfu-separator ?\s     ; Orderless field separator
+            corfu-quit-at-boundary nil   ; Never quit at completion boundary
+            corfu-quit-no-match nil      ; Never quit, even if there is no match
+            corfu-preview-current 'insert ; Preview current candidate
+            corfu-preselect 'prompt       ; Preselect the prompt
+            corfu-on-exact-match nil      ; Configure handling of exact matches
+            corfu-scroll-margin 5         ; Use scroll margin
+            corfu-count 16)               ; Maximum number of candidates to show
 
+    ;; Enable Corfu globally
+    (global-corfu-mode))
+  
+  ;; If package is installed, require it to ensure it loads
+  (require 'corfu nil t))
+
+;; Cape (Completion At Point Extensions)
+(when (package-installed-p 'cape)
+  (with-eval-after-load 'cape
+    ;; Add useful cape functions to the completion-at-point-functions
+    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+    (add-to-list 'completion-at-point-functions #'cape-file)
+    (add-to-list 'completion-at-point-functions #'cape-elisp-block))
+  
+  ;; If package is installed, require it to ensure it loads
+  (require 'cape nil t))
+
+;; Company (fallback if Corfu is not available)
+(unless (package-installed-p 'corfu)
+  (message "Corfu not available, falling back to Company mode")
+  (require 'company)
+  (setopt company-idle-delay 0.1
+          company-tooltip-align-annotations t)
+  (global-company-mode 1))
+
+;; Company helper macro (for fallback mode)
 (defmacro my/company-backend-for-hook (hook backends)
   "Set BACKENDS for company completion on HOOK."
   `(add-hook ,hook (lambda ()
@@ -202,7 +244,7 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
         ;; Performance tuning
         lsp-idle-delay 0.5
         lsp-log-io nil  ; Disable IO logging for performance (set to t for debugging)
-        lsp-completion-provider :none  ; Use company-capf
+        lsp-completion-provider :capf  ; Use completion-at-point (works with Corfu)
         lsp-prefer-flymake nil  ; Use flycheck
         lsp-enable-file-watchers nil  ; Disable file watchers for performance
         lsp-enable-folding nil  ; Disable folding for performance
@@ -319,9 +361,17 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 (defun my/setup-python-development ()
   "Configure Python development environment for current buffer."
-  (my/company-backend-for-hook 'lsp-completion-mode-hook
-                               '((company-capf :with company-yasnippet)
-                                 company-dabbrev-code))
+  ;; Use Corfu with Cape if available, otherwise fall back to Company
+  (if (package-installed-p 'corfu)
+      ;; Corfu setup
+      (when (featurep 'cape)
+        ;; Add yasnippet support via Cape
+        (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+    ;; Company fallback setup
+    (my/company-backend-for-hook 'lsp-completion-mode-hook
+                                 '((company-capf :with company-yasnippet)
+                                   company-dabbrev-code)))
+  
   (require 'lsp-pyright)
   (lsp-deferred)
   (yas-minor-mode 1)
@@ -338,9 +388,17 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 (defun my/setup-typescript-development ()
   "Configure TypeScript/JavaScript development environment for current buffer."
-  (my/company-backend-for-hook 'lsp-completion-mode-hook
-                               '((company-capf :with company-yasnippet)
-                                 company-dabbrev-code))
+  ;; Use Corfu with Cape if available, otherwise fall back to Company
+  (if (package-installed-p 'corfu)
+      ;; Corfu setup
+      (when (featurep 'cape)
+        ;; Add yasnippet support via Cape
+        (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+    ;; Company fallback setup
+    (my/company-backend-for-hook 'lsp-completion-mode-hook
+                                 '((company-capf :with company-yasnippet)
+                                   company-dabbrev-code)))
+  
   (lsp-deferred)
   (yas-minor-mode 1)
   (when (fboundp 'dap-mode)
@@ -443,9 +501,7 @@ Otherwise, perform default deactivation behavior."
      "a4340c197a450c77c729cad236b5f3ca88aaf974e91a7af2d2e7ae7bb5f96720"
      "6b20d669fcbcd79c6d0f3db36a71af1b88763246d3550a0c361866adecb38a9e"
      default))
- '(package-selected-packages
-   '(company consult-lsp dap-mode elfeed flycheck lsp-pyright lsp-ui
-             typescript-mode yasnippet)))
+ '(package-selected-packages nil))
 
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
@@ -460,4 +516,7 @@ Otherwise, perform default deactivation behavior."
 
 ;; OPAM (OCaml Package Manager) integration
 (require 'opam-user-setup "~/.emacs.d/opam-user-setup.el")
+
+;; Development testing utilities
 (load-file "~/.emacs.d/test-lsp-booster.el")
+(load-file "~/.emacs.d/test-corfu-migration.el")
