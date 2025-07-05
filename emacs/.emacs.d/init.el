@@ -320,7 +320,33 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 (with-eval-after-load 'lsp-mode
   (define-key lsp-mode-map [remap lsp-treemacs-errors-list] #'consult-lsp-diagnostics)
   (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols)
-  (add-hook 'lsp-mode-hook #'lsp-enable-which-key-integration))
+  (add-hook 'lsp-mode-hook #'lsp-enable-which-key-integration)
+  
+  ;; Define ESLint Language Server Client
+  (lsp-register-client
+   (make-lsp-client
+    :new-connection (lsp-stdio-connection
+                     (lambda ()
+                       (list "/Users/jth/.volta/bin/vscode-eslint-language-server" "--stdio")))
+    :activation-fn (lsp-activate-on "typescript" "javascript" "javascriptreact" 
+                                    "typescriptreact" "javascript.jsx" "typescript.tsx")
+    :server-id 'eslint-lsp
+    :priority -1
+    :add-on? t
+    :multi-root t
+    :initialization-options
+    (lambda ()
+      (list :nodePath "/Users/jth/.volta/bin/node"
+            :quiet :json-false
+            :rulesCustomizations []
+            :run "onType"
+            :validate "on"
+            :packageManager "npm"
+            :codeActionOnSave (list :mode "all" :rules [])
+            :format :json-false
+            :onIgnoredFiles "off"
+            :problems (list :shortenToSingleLine :json-false)
+            :workingDirectory (list :mode "auto")))))) ; End of lsp-register-client and with-eval-after-load
 
 ;; Debug Adapter Protocol
 (setopt dap-auto-configure-mode t)
@@ -570,3 +596,4 @@ Otherwise, perform default deactivation behavior."
 (load-file "~/.emacs.d/test-lsp-booster.el")
 (load-file "~/.emacs.d/test-corfu-migration.el")
 (load-file "~/.emacs.d/test-apheleia.el")
+(load-file "~/tilde/test-eslint-lsp.el")
