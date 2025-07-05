@@ -81,6 +81,7 @@
 (defconst my-packages
   '(apheleia               ; Asynchronous code formatting
     cape                   ; Completion At Point Extensions for Corfu
+    combobulate            ; Structural editing with tree-sitter
     company                ; Code and text completion framework (legacy, will be phased out)
     consult                ; Incremental narrowing
     consult-lsp            ; Improve working between `consult` and `lsp-mode`
@@ -262,6 +263,48 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
   
   ;; Load the package
   (require 'apheleia nil t))
+
+;; Combobulate (structural editing with tree-sitter)
+(when (package-installed-p 'combobulate)
+  (with-eval-after-load 'combobulate
+    ;; Core configuration
+    (setopt combobulate-flash-node t          ; Flash nodes during navigation
+            combobulate-beginning-of-defun-behavior 'parent  ; Navigate to parent level
+            combobulate-navigate-logical t)    ; Use logical navigation
+    
+    ;; Key bindings with C-c o prefix (for "combobulate")
+    (define-prefix-command 'combobulate-prefix-map)
+    (global-set-key (kbd "C-c o") 'combobulate-prefix-map)
+    
+    ;; Navigation commands
+    (define-key combobulate-prefix-map (kbd "n") 'combobulate-navigate-next)
+    (define-key combobulate-prefix-map (kbd "p") 'combobulate-navigate-previous)
+    (define-key combobulate-prefix-map (kbd "u") 'combobulate-navigate-up)
+    (define-key combobulate-prefix-map (kbd "d") 'combobulate-navigate-down)
+    
+    ;; Selection commands
+    (define-key combobulate-prefix-map (kbd "m") 'combobulate-mark-node-dwim)
+    (define-key combobulate-prefix-map (kbd "M") 'combobulate-mark-node-at-point)
+    
+    ;; Manipulation commands
+    (define-key combobulate-prefix-map (kbd "t") 'combobulate-transpose-sexps)
+    (define-key combobulate-prefix-map (kbd "k") 'combobulate-kill-node-dwim)
+    (define-key combobulate-prefix-map (kbd "c") 'combobulate-clone-node-dwim)
+    (define-key combobulate-prefix-map (kbd "r") 'combobulate-splice-self)
+    
+    ;; Convenience commands
+    (define-key combobulate-prefix-map (kbd "h") 'combobulate-highlight-node)
+    (define-key combobulate-prefix-map (kbd "e") 'combobulate-edit-node-dwim)
+    (define-key combobulate-prefix-map (kbd "i") 'combobulate-indent-defun)
+    
+    ;; Additional useful commands
+    (define-key combobulate-prefix-map (kbd "w") 'combobulate-drag-up)
+    (define-key combobulate-prefix-map (kbd "s") 'combobulate-drag-down)
+    (define-key combobulate-prefix-map (kbd "f") 'combobulate-forward-sexp-function)
+    (define-key combobulate-prefix-map (kbd "b") 'combobulate-backward-sexp-function))
+  
+  ;; Load the package
+  (require 'combobulate nil t))
 
 ;; Company (fallback if Corfu is not available)
 (unless (package-installed-p 'corfu)
@@ -473,6 +516,10 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
     (my/company-backend-for-hook 'lsp-completion-mode-hook
                                  '((company-capf :with company-yasnippet)
                                    company-dabbrev-code)))
+  
+  ;; Enable Combobulate for structural editing if available
+  (when (package-installed-p 'combobulate)
+    (combobulate-mode 1))
   
   (lsp-deferred)
   (yas-minor-mode 1)
