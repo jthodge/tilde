@@ -643,4 +643,4 @@ Otherwise, perform default deactivation behavior."
 (load-file "~/.emacs.d/test-lsp-booster.el")
 (load-file "~/.emacs.d/test-corfu-migration.el")
 (load-file "~/.emacs.d/test-apheleia.el")
-(load-file "~/tilde/test-eslint-lsp.el")
+(load-file "~/.emacs.d/test-eslint-lsp.el")
