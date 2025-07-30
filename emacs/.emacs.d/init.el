@@ -227,6 +227,9 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 ;; Configure file watching after lsp-mode loads
 (with-eval-after-load 'lsp-mode
+  ;; Ensure flycheck is loaded before lsp-diagnostics
+  (when (package-installed-p 'flycheck)
+    (require 'flycheck nil t))
   ;; Ensure lsp-diagnostics is loaded for flycheck faces
   (require 'lsp-diagnostics)
   
