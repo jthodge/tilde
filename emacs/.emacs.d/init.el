@@ -81,7 +81,6 @@
 (defconst my-packages
   '(apheleia               ; Asynchronous code formatting
     cape                   ; Completion At Point Extensions for Corfu
-    company                ; Code and text completion framework (legacy, will be phased out)
     consult                ; Incremental narrowing
     consult-lsp            ; Improve working between `consult` and `lsp-mode`
     corfu                  ; Modern completion frontend
@@ -263,21 +262,6 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
   ;; Load the package
   (require 'apheleia nil t))
 
-;; Company (fallback if Corfu is not available)
-(unless (package-installed-p 'corfu)
-  (message "Corfu not available, falling back to Company mode")
-  (require 'company)
-  (setopt company-idle-delay 0.1
-          company-tooltip-align-annotations t)
-  (global-company-mode 1))
-
-;; Company helper macro (for fallback mode)
-(defmacro my/company-backend-for-hook (hook backends)
-  "Set BACKENDS for company completion on HOOK."
-  `(add-hook ,hook (lambda ()
-                     (set (make-local-variable 'company-backends)
-                          ,backends))))
-
 ;; Snippets
 (with-eval-after-load 'yasnippet
   (yas-reload-all))
@@ -436,17 +420,13 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 (defun my/setup-python-development ()
   "Configure Python development environment for current buffer."
-  ;; Use Corfu with Cape if available, otherwise fall back to Company
+  ;; Use Corfu with Cape if available
   (if (package-installed-p 'corfu)
       ;; Corfu setup
       (when (featurep 'cape)
         ;; Add yasnippet support via Cape
-        (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
-    ;; Company fallback setup
-    (my/company-backend-for-hook 'lsp-completion-mode-hook
-                                 '((company-capf :with company-yasnippet)
-                                   company-dabbrev-code)))
-  
+        (add-to-list 'completion-at-point-functions #'cape-yasnippet t)))
+
   (require 'lsp-pyright)
   (lsp-deferred)
   (yas-minor-mode 1)
@@ -463,16 +443,12 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 (defun my/setup-typescript-development ()
   "Configure TypeScript/JavaScript development environment for current buffer."
-  ;; Use Corfu with Cape if available, otherwise fall back to Company
+  ;; Use Corfu with Cape if available
   (if (package-installed-p 'corfu)
       ;; Corfu setup
       (when (featurep 'cape)
         ;; Add yasnippet support via Cape
-        (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
-    ;; Company fallback setup
-    (my/company-backend-for-hook 'lsp-completion-mode-hook
-                                 '((company-capf :with company-yasnippet)
-                                   company-dabbrev-code)))
+        (add-to-list 'completion-at-point-functions #'cape-yasnippet t)))
 
   (lsp-deferred)
   (yas-minor-mode 1)
