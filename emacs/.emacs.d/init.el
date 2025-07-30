@@ -61,11 +61,21 @@
 (setq show-paren-delay 0)
 (show-paren-mode 1)
 
-;; Completion
-(ido-mode 1)
-(ido-everywhere)
-(setq ido-enable-flex-matching t)
-(fido-mode)
+;; Minibuffer completion
+(when (package-installed-p 'vertico)
+  (with-eval-after-load 'vertico
+    (vertico-mode))
+  (require 'vertico nil t))
+
+(when (package-installed-p 'orderless)
+  (require 'orderless nil t)
+  (setq completion-styles '(orderless basic)
+        completion-category-overrides '((file (styles basic partial-completion)))))
+
+(when (package-installed-p 'marginalia)
+  (with-eval-after-load 'marginalia
+    (marginalia-mode))
+  (require 'marginalia nil t))
 
 ;;; ================================================================
 ;;; PACKAGE MANAGEMENT
@@ -89,7 +99,10 @@
     lsp-mode               ; Language Server Protocol support
     lsp-pyright            ; Language Server Protocol client using pyright Python Language Server
     lsp-ui                 ; UI improvements for `lsp-mode`
+    marginalia             ; Rich completion annotations
+    orderless              ; Flexible completion matching
     typescript-mode        ; TypeScript editing support (fallback for non-tree-sitter)
+    vertico                ; Modern vertical completion
     which-key              ; Display currently available keybindings
     yasnippet              ; Snippet and template management
     ))
