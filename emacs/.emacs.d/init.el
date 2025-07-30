@@ -473,12 +473,6 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 (add-hook 'typescript-mode-hook #'my/setup-typescript-development)
 
 ;;; ================================================================
-;;; LANGUAGE SUPPORT - OCAML
-;;; ================================================================
-
-(add-to-list 'load-path "/Users/jth/.opam/default/share/emacs/site-lisp")
-(require 'ocp-indent)
-
 ;;; ================================================================
 ;;; UV PYTHON ENVIRONMENT MANAGEMENT
 ;;; ================================================================
@@ -577,9 +571,6 @@ Otherwise, perform default deactivation behavior."
 ;;; ================================================================
 ;;; EXTERNAL INTEGRATIONS
 ;;; ================================================================
-
-;; OPAM (OCaml Package Manager) integration
-(require 'opam-user-setup "~/.emacs.d/opam-user-setup.el")
 
 ;; Development testing utilities
 (load-file "~/.emacs.d/test-lsp-booster.el")
