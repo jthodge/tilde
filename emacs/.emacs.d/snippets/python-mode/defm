@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: method definition with type hints
+# key: defm
+# --
+def ${1:method_name}(self${2:, ${3:param}: ${4:type}}) -> ${5:None}:
+    """${6:Method description.}${2:
+
+    Args:
+        ${3:param} (${4:type}): ${7:Parameter description.}}
+
+    Returns:
+        ${5:None}: ${8:Return description.}
+    """
+    ${0:pass}

@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: async function definition
+# key: async
+# --
+async def ${1:function_name}(${2:param}: ${3:type}) -> ${4:None}:
+    """${5:Async function description.}
+
+    Args:
+        ${2:param} (${3:type}): ${6:Parameter description.}
+
+    Returns:
+        ${4:None}: ${7:Return description.}
+    """
+    ${0:pass}

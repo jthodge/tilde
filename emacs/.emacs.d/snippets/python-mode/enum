@@ -1,0 +1,11 @@
+# -*- mode: snippet -*-
+# name: enum class
+# key: enum
+# --
+from enum import Enum
+
+
+class ${1:MyEnum}(Enum):
+    """${2:Enum description.}"""
+    ${3:VALUE} = "${4:value}"
+    ${0:pass}

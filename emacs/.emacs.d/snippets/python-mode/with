@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: with statement (context manager)
+# key: with
+# --
+with ${1:open("${2:filename}", "${3:r}")} as ${4:f}:
+    ${0:pass}

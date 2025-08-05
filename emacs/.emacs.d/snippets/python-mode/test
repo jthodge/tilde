@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: test function
+# key: test
+# --
+def test_${1:function_name}():
+    """${2:Test description.}"""
+    # Arrange
+    ${3:pass}
+
+    # Act
+    ${4:result = function_call()}
+
+    # Assert
+    ${0:assert result == expected}

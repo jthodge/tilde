@@ -1,0 +1,13 @@
+# -*- mode: snippet -*-
+# name: property definition
+# key: prop
+# --
+@property
+def ${1:property_name}(self) -> ${2:type}:
+    """${3:Property description.}"""
+    return self._${1:$(yas-field-value 1)}
+
+@${1:$(yas-field-value 1)}.setter
+def ${1:$(yas-field-value 1)}(self, value: ${2:$(yas-field-value 2)}) -> None:
+    """Set ${1:$(yas-field-value 1)}."""
+    self._${1:$(yas-field-value 1)} = value

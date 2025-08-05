@@ -101,7 +101,6 @@
     lsp-ui                 ; UI improvements for `lsp-mode`
     marginalia             ; Rich completion annotations
     orderless              ; Flexible completion matching
-    typescript-mode        ; TypeScript editing support (fallback for non-tree-sitter)
     vertico                ; Modern vertical completion
     which-key              ; Display currently available keybindings
     yasnippet              ; Snippet and template management
@@ -138,17 +137,17 @@
 ;;; Core LSP Configuration
 ;;; ----------------------------------------------------------------
 
-;; Set lsp-use-plists early for better performance
-;; This MUST be set before lsp-mode is loaded for the first time
-(setenv "LSP_USE_PLISTS" "true")
+;; Disable plists for compatibility with updated lsp-mode
+;; The updated lsp-mode may have changed plist handling
+(setenv "LSP_USE_PLISTS" nil)
 
-;; Set lsp-use-plists after packages are available but before lsp-mode is loaded
+;; Ensure lsp-use-plists is disabled
 (with-eval-after-load 'lsp-protocol
-  (setq lsp-use-plists t))
+  (setq lsp-use-plists nil))
 
 ;; Also set it if lsp-protocol is already loaded
 (when (featurep 'lsp-protocol)
-  (setq lsp-use-plists t))
+  (setq lsp-use-plists nil))
 
 ;; Core LSP Mode configuration
 (setopt lsp-keymap-prefix "C-c l"
@@ -175,42 +174,25 @@
         lsp-completion-show-kind t)
 
 ;;; ----------------------------------------------------------------
-;;; LSP Performance & Booster
+;;; LSP Performance Optimization
 ;;; ----------------------------------------------------------------
 
-(defun my/lsp-booster-find-executable ()
-  "Find emacs-lsp-booster executable in common locations."
-  (or (executable-find "emacs-lsp-booster")
-      (let ((cargo-path (expand-file-name "~/.cargo/bin/emacs-lsp-booster")))
-        (when (file-executable-p cargo-path)
-          cargo-path))))
-
-;; Define advice functions for LSP Booster
-(defun lsp-booster--advice-json-parse (old-fn &rest args)
-  "Try to parse bytecode instead of json.
-This allows emacs-lsp-booster to work correctly with bytecode responses."
-  (or (when (equal (following-char) ?#)
-        (let ((bytecode (read (current-buffer))))
-          (when (byte-code-function-p bytecode)
-            (funcall bytecode))))
-      (apply old-fn args)))
-
-(defun lsp-booster--advice-final-command (old-fn cmd &optional test?)
-  "Prepend emacs-lsp-booster command to lsp CMD when appropriate."
-  (let ((orig-result (funcall old-fn cmd test?)))
-    (if (and (not test?)                                  ; Not a test run
-             (not (file-remote-p default-directory))      ; Not on remote
-             (or (and (boundp 'lsp-use-plists) lsp-use-plists) ; plists enabled
-                 (getenv "LSP_USE_PLISTS"))               ; or env var set
-             (not (functionp 'json-rpc-connection))       ; Not using json-rpc
-             (my/lsp-booster-find-executable))             ; Booster is available
-        (progn
-          ;; Resolve the command path if needed
-          (when-let ((command-from-exec-path (executable-find (car orig-result))))
-            (setcar orig-result command-from-exec-path))
-          (message "LSP Booster: Wrapping command %s" orig-result)
-          (cons (my/lsp-booster-find-executable) orig-result))
-      orig-result)))
+;; TODO: Install and configure emacs-lsp-booster for improved LSP performance
+;; emacs-lsp-booster provides significant performance improvements by:
+;; - Converting JSON responses to bytecode for faster parsing
+;; - Reducing CPU usage during LSP communication
+;; - Improving overall responsiveness
+;;
+;; Installation:
+;; 1. Install via cargo: cargo install emacs-lsp-booster
+;; 2. Ensure ~/.cargo/bin is in PATH or exec-path
+;; 3. Configure advice functions to wrap LSP commands
+;; 4. Test compatibility with current lsp-mode version
+;;
+;; Temporarily disabled due to compatibility issues with updated lsp-mode package.
+;; The booster converts messages to plist format, but the new lsp-mode (20250730.1549)
+;; expects hash-table format, causing "wrong-type-argument hash-table-p" errors.
+;; This breaks all LSP communication and diagnostic display.
 
 ;;; ----------------------------------------------------------------
 ;;; LSP UI Configuration
@@ -232,7 +214,7 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
     (require 'flycheck nil t))
   ;; Ensure lsp-diagnostics is loaded for flycheck faces
   (require 'lsp-diagnostics)
-  
+
   ;; File watching ignore patterns
   (setq lsp-file-watch-ignored-directories
         (append lsp-file-watch-ignored-directories
@@ -242,61 +224,47 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
                   "[/\\\\]__pycache__\\'"
                   "[/\\\\]node_modules\\'"
                   "[/\\\\]\\.DS_Store\\'")))
-  
-  ;; Prevent company-mode warnings when using Corfu
-  (defun lsp-completion--enable ()
-    "Enable LSP completion support - modified to not warn about company-mode."
-    (when (and lsp-completion-enable
-               (not (bound-and-true-p company-mode)))
-      ;; Silently skip company configuration when using other completion systems
-      (setq-local completion-at-point-functions
-                  (list #'lsp-completion-at-point))))
-  
+
+  ;; Remove custom lsp-completion--enable function - let LSP handle completion setup
+  ;; The custom function was interfering with proper completion initialization
+
   ;; Consult integration
   (define-key lsp-mode-map [remap lsp-treemacs-errors-list] #'consult-lsp-diagnostics)
   (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols)
-  
+
   ;; Which-key integration
-  (add-hook 'lsp-mode-hook #'lsp-enable-which-key-integration)
-  
-  ;; Apply LSP Booster advice
-  (advice-add (if (progn (require 'json nil t)
-                         (fboundp 'json-parse-buffer))
-                  'json-parse-buffer
-                'json-read)
-              :around #'lsp-booster--advice-json-parse)
-  (advice-add 'lsp-resolve-final-command :around #'lsp-booster--advice-final-command))
+  (add-hook 'lsp-mode-hook #'lsp-enable-which-key-integration))
 
 ;;; ----------------------------------------------------------------
 ;;; Language-Specific LSP Servers
 ;;; ----------------------------------------------------------------
 
-;; ESLint Language Server for TypeScript/JavaScript
-(with-eval-after-load 'lsp-mode
-  (lsp-register-client
-   (make-lsp-client
-    :new-connection (lsp-stdio-connection
-                     (lambda ()
-                       (list "/Users/jth/.volta/bin/vscode-eslint-language-server" "--stdio")))
-    :activation-fn (lsp-activate-on "typescript" "javascript" "javascriptreact" 
-                                    "typescriptreact" "javascript.jsx" "typescript.tsx")
-    :server-id 'eslint-lsp
-    :priority -1
-    :add-on? t
-    :multi-root t
-    :initialization-options
-    (lambda ()
-      (list :nodePath "/Users/jth/.volta/bin/node"
-            :quiet :json-false
-            :rulesCustomizations []
-            :run "onType"
-            :validate "on"
-            :packageManager "npm"
-            :codeActionOnSave (list :mode "all" :rules [])
-            :format :json-false
-            :onIgnoredFiles "off"
-            :problems (list :shortenToSingleLine :json-false)
-            :workingDirectory (list :mode "auto"))))))
+;; TODO: Re-enable ESLint Language Server for TypeScript/JavaScript after Python is perfected
+;; (with-eval-after-load 'lsp-mode
+;;   (lsp-register-client
+;;    (make-lsp-client
+;;     :new-connection (lsp-stdio-connection
+;;                      (lambda ()
+;;                        (list "/Users/jth/.volta/bin/vscode-eslint-language-server" "--stdio")))
+;;     :activation-fn (lsp-activate-on "typescript" "javascript" "javascriptreact"
+;;                                     "typescriptreact" "javascript.jsx" "typescript.tsx")
+;;     :server-id 'eslint-lsp
+;;     :priority -1
+;;     :add-on? t
+;;     :multi-root t
+;;     :initialization-options
+;;     (lambda ()
+;;       (list :nodePath "/Users/jth/.volta/bin/node"
+;;             :quiet :json-false
+;;             :rulesCustomizations []
+;;             :run "onType"
+;;             :validate "on"
+;;             :packageManager "npm"
+;;             :codeActionOnSave (list :mode "all" :rules [])
+;;             :format :json-false
+;;             :onIgnoredFiles "off"
+;;             :problems (list :shortenToSingleLine :json-false)
+;;             :workingDirectory (list :mode "auto"))))))
 
 ;;; ================================================================
 ;;; TREE-SITTER CONFIGURATION
@@ -311,22 +279,36 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
   (interactive)
   (when (and (fboundp 'treesit-install-language-grammar)
              (boundp 'treesit-language-source-alist))
-    (let ((grammars '((c "https://github.com/tree-sitter/tree-sitter-c")
-                      (cmake "https://github.com/uyha/tree-sitter-cmake")
-                      (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
-                      (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
-                      (elisp "https://github.com/Wilfred/tree-sitter-elisp")
-                      (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
-                      (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
-                      (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
-                      ;; TODO: confirm smooth dovetail with existing python lang support
-                      ;; (python . ("https://github.com/tree-sitter/tree-sitter-python" "v0.20.4"))
-                      (make "https://github.com/alemuller/tree-sitter-make")
-                      (markdown "https://github.com/ikatyang/tree-sitter-markdown")
-                      (toml "https://github.com/tree-sitter/tree-sitter-toml")
-                      (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
-                      (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))
-                      (yaml . ("https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0")))))
+    (let ((grammars '(;; TODO: Re-enable C language support after Python is perfected
+                      ;; (c "https://github.com/tree-sitter/tree-sitter-c")
+                      ;; TODO: Re-enable CMake language support after Python is perfected
+                      ;; (cmake "https://github.com/uyha/tree-sitter-cmake")
+                      ;; TODO: Re-enable C++ language support after Python is perfected
+                      ;; (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
+                      ;; TODO: Re-enable CSS language support after Python is perfected
+                      ;; (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
+                      ;; TODO: Re-enable Elisp language support after Python is perfected
+                      ;; (elisp "https://github.com/Wilfred/tree-sitter-elisp")
+                      ;; TODO: Re-enable HTML language support after Python is perfected
+                      ;; (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
+                      ;; TODO: Re-enable JavaScript language support after Python is perfected
+                      ;; (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
+                      ;; TODO: Re-enable JSON language support after Python is perfected
+                      ;; (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
+                      (python . ("https://github.com/tree-sitter/tree-sitter-python" "v0.20.4"))
+                      ;; TODO: Re-enable Make language support after Python is perfected
+                      ;; (make "https://github.com/alemuller/tree-sitter-make")
+                      ;; TODO: Re-enable Markdown language support after Python is perfected
+                      ;; (markdown "https://github.com/ikatyang/tree-sitter-markdown")
+                      ;; TODO: Re-enable TOML language support after Python is perfected
+                      ;; (toml "https://github.com/tree-sitter/tree-sitter-toml")
+                      ;; TODO: Re-enable TSX language support after Python is perfected
+                      ;; (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
+                      ;; TODO: Re-enable TypeScript language support after Python is perfected
+                      ;; (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))
+                      ;; TODO: Re-enable YAML language support after Python is perfected
+                      ;; (yaml . ("https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0"))
+                      )))
       (dolist (grammar grammars)
         (add-to-list 'treesit-language-source-alist grammar)
         (condition-case err
@@ -343,12 +325,15 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
   "Configure major mode remapping for tree-sitter modes."
   (when (and (fboundp 'treesit-available-p)
              (boundp 'major-mode-remap-alist))
-    ;; TODO: complete mode remappings
-    (let ((mode-mappings '((typescript-mode . typescript-ts-mode)
-                           (js-mode . typescript-ts-mode)
-                           (js2-mode . typescript-ts-mode)
-                           (json-mode . json-ts-mode)
-                           (js-json-mode . json-ts-mode))))
+    (let ((mode-mappings '(;; TODO: Re-enable TypeScript mode remapping after Python is perfected
+                           ;; (typescript-mode . typescript-ts-mode)
+                           ;; TODO: Re-enable JavaScript mode remapping after Python is perfected
+                           ;; (js-mode . typescript-ts-mode)
+                           ;; (js2-mode . typescript-ts-mode)
+                           ;; TODO: Re-enable JSON mode remapping after Python is perfected
+                           ;; (json-mode . json-ts-mode)
+                           ;; (js-json-mode . json-ts-mode)
+                           )))
       (dolist (mapping mode-mappings)
         (add-to-list 'major-mode-remap-alist mapping)))))
 
@@ -359,16 +344,21 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 (defun my/setup-treesitter-auto-modes ()
   "Configure file associations for tree-sitter modes."
   (when (fboundp 'treesit-available-p)
-    ;; TODO: complete file associations
-    (let ((file-associations '(("\\.tsx\\'" . tsx-ts-mode)
-                               ("\\.js\\'" . typescript-ts-mode)
-                               ("\\.mjs\\'" . typescript-ts-mode)
-                               ("\\.mts\\'" . typescript-ts-mode)
-                               ("\\.cjs\\'" . typescript-ts-mode)
-                               ("\\.ts\\'" . typescript-ts-mode)
-                               ("\\.jsx\\'" . tsx-ts-mode)
-                               ("\\.json\\'" . json-ts-mode)
-                               ("\\.Dockerfile\\'" . dockerfile-ts-mode))))
+    (let ((file-associations '(;; TODO: Re-enable TSX file associations after Python is perfected
+                               ;; ("\\.tsx\\'" . tsx-ts-mode)
+                               ;; TODO: Re-enable JavaScript file associations after Python is perfected
+                               ;; ("\\.js\\'" . typescript-ts-mode)
+                               ;; ("\\.mjs\\'" . typescript-ts-mode)
+                               ;; ("\\.mts\\'" . typescript-ts-mode)
+                               ;; ("\\.cjs\\'" . typescript-ts-mode)
+                               ;; TODO: Re-enable TypeScript file associations after Python is perfected
+                               ;; ("\\.ts\\'" . typescript-ts-mode)
+                               ;; ("\\.jsx\\'" . tsx-ts-mode)
+                               ;; TODO: Re-enable JSON file associations after Python is perfected
+                               ;; ("\\.json\\'" . json-ts-mode)
+                               ;; TODO: Re-enable Dockerfile associations after Python is perfected
+                               ;; ("\\.Dockerfile\\'" . dockerfile-ts-mode)
+                               )))
       (dolist (association file-associations)
         (add-to-list 'auto-mode-alist association)))))
 
@@ -387,36 +377,41 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 ;; Corfu (modern completion framework)
 (when (package-installed-p 'corfu)
-  (with-eval-after-load 'corfu
-    (setopt corfu-cycle t           ; Enable cycling for `corfu-next/previous'
-            corfu-auto t            ; Enable auto completion
-            corfu-auto-delay 0.1    ; Auto completion delay
-            corfu-auto-prefix 1     ; Minimum prefix length for auto completion
-            corfu-separator ?\s     ; Orderless field separator
-            corfu-quit-at-boundary nil   ; Never quit at completion boundary
-            corfu-quit-no-match nil      ; Never quit, even if there is no match
-            corfu-preview-current 'insert ; Preview current candidate
-            corfu-preselect 'prompt       ; Preselect the prompt
-            corfu-on-exact-match nil      ; Configure handling of exact matches
-            corfu-scroll-margin 5         ; Use scroll margin
-            corfu-count 16)               ; Maximum number of candidates to show
+  ;; Load Corfu immediately and configure it
+  (require 'corfu)
 
-    ;; Enable Corfu globally
-    (global-corfu-mode))
+  (setq corfu-cycle t                    ; Enable cycling for `corfu-next/previous'
+        corfu-auto t                     ; Enable auto completion
+        corfu-auto-delay 0.1             ; Auto completion delay
+        corfu-auto-prefix 1              ; Minimum prefix length for auto completion
+        corfu-separator ?\s              ; Orderless field separator
+        corfu-quit-at-boundary nil       ; Never quit at completion boundary
+        corfu-quit-no-match nil          ; Never quit, even if there is no match
+        corfu-preview-current 'insert    ; Preview current candidate
+        corfu-preselect 'prompt          ; Preselect the prompt
+        corfu-on-exact-match nil         ; Configure handling of exact matches
+        corfu-scroll-margin 5            ; Use scroll margin
+        corfu-count 16)                  ; Maximum number of candidates to show
 
-  ;; If package is installed, require it to ensure it loads
-  (require 'corfu nil t))
+  ;; Enable Corfu globally
+  (global-corfu-mode 1)
+
+  ;; Add completion keybindings
+  (define-key corfu-map (kbd "TAB") #'corfu-next)
+  (define-key corfu-map [tab] #'corfu-next)
+  (define-key corfu-map (kbd "S-TAB") #'corfu-previous)
+  (define-key corfu-map [backtab] #'corfu-previous))
 
 ;; Cape (Completion At Point Extensions)
 (when (package-installed-p 'cape)
-  (with-eval-after-load 'cape
-    ;; Add useful cape functions to the completion-at-point-functions
-    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
-    (add-to-list 'completion-at-point-functions #'cape-file)
-    (add-to-list 'completion-at-point-functions #'cape-elisp-block))
+  ;; Load Cape immediately
+  (require 'cape)
 
-  ;; If package is installed, require it to ensure it loads
-  (require 'cape nil t))
+  ;; Add useful cape functions to the global completion-at-point-functions
+  ;; These will be available as fallbacks in all buffers
+  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+  (add-to-list 'completion-at-point-functions #'cape-file)
+  (add-to-list 'completion-at-point-functions #'cape-elisp-block))
 
 ;; Apheleia (asynchronous code formatting)
 (when (package-installed-p 'apheleia)
@@ -426,28 +421,33 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
             apheleia-hide-log-buffers t         ; Hide log buffers by default
             apheleia-formatters-respect-indent-level t) ; Respect buffer indentation
 
-    ;; Configure Volta-managed formatters
-    (setf (alist-get 'prettier-volta apheleia-formatters)
-          '("/Users/jth/.volta/bin/prettier"
-            "--stdin-filepath" filepath
-            (apheleia-formatters-locate-file ".prettierrc.js" ".prettierrc.json" ".prettierrc.yml" ".prettierrc.yaml" ".prettierrc")))
+    ;; Configure Python formatters
+    (setf (alist-get 'ruff apheleia-formatters)
+          '("ruff" "format" "--stdin-filename" filepath "-"))
 
-    (setf (alist-get 'eslint-volta apheleia-formatters)
-          '("/Users/jth/.volta/bin/eslint"
-            "--stdin-filename" filepath
-            "--fix-dry-run"
-            "--format" "json"
-            "--stdin"))
+    ;; Configure mode associations for Python files
+    (setf (alist-get 'python-mode apheleia-mode-alist) 'ruff)
+    (setf (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff)
 
-    ;; Configure mode associations for TypeScript/JavaScript files
-    (setf (alist-get 'typescript-ts-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'tsx-ts-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'typescript-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'js-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'js2-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'javascript-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'json-mode apheleia-mode-alist) 'prettier-volta)
-    (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'prettier-volta)
+    ;; TODO: Re-enable non-Python formatters after Python is perfected
+    ;; (setf (alist-get 'prettier-volta apheleia-formatters)
+    ;;       '("/Users/jth/.volta/bin/prettier"
+    ;;         "--stdin-filepath" filepath
+    ;;         (apheleia-formatters-locate-file ".prettierrc.js" ".prettierrc.json" ".prettierrc.yml" ".prettierrc.yaml" ".prettierrc")))
+    ;; (setf (alist-get 'eslint-volta apheleia-formatters)
+    ;;       '("/Users/jth/.volta/bin/eslint"
+    ;;         "--stdin-filename" filepath
+    ;;         "--fix-dry-run"
+    ;;         "--format" "json"
+    ;;         "--stdin"))
+    ;; (setf (alist-get 'typescript-ts-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'tsx-ts-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'typescript-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'js-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'js2-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'javascript-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'json-mode apheleia-mode-alist) 'prettier-volta)
+    ;; (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'prettier-volta)
 
     ;; Key bindings for manual formatting
     (global-set-key (kbd "C-c f") #'apheleia-format-buffer)
@@ -485,22 +485,42 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 
 (defun my/setup-python-development ()
   "Configure Python development environment for current buffer."
-  ;; Use Corfu with Cape if available
-  (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
-    ;; Ensure cape is loaded before using its functions
-    (require 'cape nil t)
-    ;; Add yasnippet support via Cape only if the function exists
-    (when (fboundp 'cape-yasnippet)
-      (add-to-list 'completion-at-point-functions #'cape-yasnippet t)))
+  ;; Enable minor modes first
+  (yas-minor-mode 1)
 
   ;; Ensure flycheck is loaded before LSP
   (when (package-installed-p 'flycheck)
     (require 'flycheck nil t))
-  
-  (require 'lsp-pyright)
-  (lsp-deferred)
-  (yas-minor-mode 1)
+
+  ;; Configure Python interpreter
   (setq-local python-shell-interpreter (executable-find "python"))
+
+  ;; Start LSP
+  (require 'lsp-pyright) ; TODO: Consider replacing with mypy-based LSP alternative for better type checking
+  (lsp-deferred)
+
+  ;; Setup completion after LSP is loaded
+  (add-hook 'lsp-mode-hook
+            (lambda ()
+              (when (eq major-mode 'python-mode)
+                ;; Ensure completion-at-point-functions is set up correctly
+                (setq-local completion-at-point-functions
+                            (list #'lsp-completion-at-point))
+
+                ;; Use Corfu with Cape if available
+                (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
+                  ;; Ensure cape is loaded before using its functions
+                  (require 'cape nil t)
+                  ;; Add cape functions to enhance completion
+                  (when (fboundp 'cape-yasnippet)
+                    (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+                  (when (fboundp 'cape-dabbrev)
+                    (add-to-list 'completion-at-point-functions #'cape-dabbrev t))
+                  (when (fboundp 'cape-file)
+                    (add-to-list 'completion-at-point-functions #'cape-file t)))))
+            nil t)
+
+  ;; Setup debugging
   (require 'dap-python)
   (setq-local dap-python-debugger 'debugpy)
   (dap-mode 1))
@@ -508,27 +528,28 @@ This allows emacs-lsp-booster to work correctly with bytecode responses."
 (add-hook 'python-mode-hook #'my/setup-python-development)
 
 ;;; ================================================================
-;;; LANGUAGE SUPPORT - TYPESCRIPT/JAVASCRIPT
+;;; LANGUAGE SUPPORT - TYPESCRIPT/JAVASCRIPT (DISABLED FOR PYTHON FOCUS)
 ;;; ================================================================
 
-(defun my/setup-typescript-development ()
-  "Configure TypeScript/JavaScript development environment for current buffer."
-  ;; Use Corfu with Cape if available
-  (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
-    ;; Ensure cape is loaded before using its functions
-    (require 'cape nil t)
-    ;; Add yasnippet support via Cape only if the function exists
-    (when (fboundp 'cape-yasnippet)
-      (add-to-list 'completion-at-point-functions #'cape-yasnippet t)))
+;; TODO: Re-enable TypeScript/JavaScript language support after Python is perfected
+;; (defun my/setup-typescript-development ()
+;;   "Configure TypeScript/JavaScript development environment for current buffer."
+;;   ;; Use Corfu with Cape if available
+;;   (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
+;;     ;; Ensure cape is loaded before using its functions
+;;     (require 'cape nil t)
+;;     ;; Add yasnippet support via Cape only if the function exists
+;;     (when (fboundp 'cape-yasnippet)
+;;       (add-to-list 'completion-at-point-functions #'cape-yasnippet t)))
 
-  (lsp-deferred)
-  (yas-minor-mode 1)
-  (when (fboundp 'dap-mode)
-    (dap-mode 1)))
+;;   (lsp-deferred)
+;;   (yas-minor-mode 1)
+;;   (when (fboundp 'dap-mode)
+;;     (dap-mode 1)))
 
-(add-hook 'typescript-ts-mode-hook #'my/setup-typescript-development)
-(add-hook 'tsx-ts-mode-hook #'my/setup-typescript-development)
-(add-hook 'typescript-mode-hook #'my/setup-typescript-development)
+;; (add-hook 'typescript-ts-mode-hook #'my/setup-typescript-development)
+;; (add-hook 'tsx-ts-mode-hook #'my/setup-typescript-development)
+;; (add-hook 'typescript-mode-hook #'my/setup-typescript-development)
 
 ;;; ================================================================
 ;;; ================================================================
@@ -634,4 +655,5 @@ Otherwise, perform default deactivation behavior."
 (load-file "~/.emacs.d/test-lsp-booster.el")
 (load-file "~/.emacs.d/test-corfu-migration.el")
 (load-file "~/.emacs.d/test-apheleia.el")
-(load-file "~/.emacs.d/test-eslint-lsp.el")
+;; TODO: Re-enable non-Python test files after Python is perfected
+;; (load-file "~/.emacs.d/test-eslint-lsp.el")

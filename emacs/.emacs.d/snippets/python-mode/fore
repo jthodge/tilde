@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: for loop with enumerate
+# key: fore
+# --
+for ${1:index}, ${2:item} in enumerate(${3:iterable}):
+    ${0:pass}

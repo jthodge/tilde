@@ -1,0 +1,15 @@
+# -*- mode: snippet -*-
+# name: context manager
+# key: contextmanager
+# --
+from contextlib import contextmanager
+
+
+@contextmanager
+def ${1:context_name}(${2:param}: ${3:type}):
+    """${4:Context manager description.}"""
+    ${5:resource = acquire_resource()}
+    try:
+        yield ${5:$(yas-field-value 5)}
+    finally:
+        ${0:release_resource()}

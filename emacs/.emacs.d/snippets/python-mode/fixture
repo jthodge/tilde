@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: pytest fixture
+# key: fixture
+# --
+@pytest.fixture
+def ${1:fixture_name}():
+    """${2:Fixture description.}"""
+    ${3:value = setup()}
+    yield ${3:$(yas-field-value 3)}
+    ${0:# cleanup if needed}

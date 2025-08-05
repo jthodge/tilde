@@ -1,6 +1,7 @@
 # -*- mode: snippet -*-
-# name: def
+# name: function definition
 # key: def
 # --
-def ${1:function_name}(${2:args}):
-    ${3:pass}
+def ${1:function_name}(${2:param}):
+    """${3:Function description.}"""
+    ${0:pass}

@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: typed function definition
+# key: deft
+# --
+def ${1:function_name}(${2:param}: ${3:type}) -> ${4:None}:
+    """${5:Function description.}
+
+    Args:
+        ${2:param} (${3:type}): ${6:Parameter description.}
+
+    Returns:
+        ${4:None}: ${7:Return description.}
+    """
+    ${0:pass}

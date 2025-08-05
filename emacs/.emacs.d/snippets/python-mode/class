@@ -1,0 +1,15 @@
+# -*- mode: snippet -*-
+# name: class definition
+# key: class
+# --
+class ${1:ClassName}${2:(${3:object})}:
+    """${4:Class description.}"""
+
+    def __init__(self, ${5:param}: ${6:type}) -> None:
+        """Initialize ${1:$(yas-field-value 1)}.
+
+        Args:
+            ${5:param} (${6:type}): ${7:Parameter description.}
+        """
+        self.${5:$(yas-field-value 5)} = ${5:$(yas-field-value 5)}
+        ${0:pass}
