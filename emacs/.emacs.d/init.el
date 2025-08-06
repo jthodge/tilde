@@ -172,7 +172,9 @@
         lsp-completion-enable t
         lsp-enable-snippet t
         lsp-completion-show-detail t
-        lsp-completion-show-kind t)
+        lsp-completion-show-kind t
+        ;; Disable volar and other Vue servers for TypeScript files
+        lsp-disabled-clients '(volar volar-api volar-doc volar-html vue-semantic-server))
 
 ;;; ----------------------------------------------------------------
 ;;; LSP Performance Optimization
@@ -216,6 +218,25 @@
   ;; Ensure lsp-diagnostics is loaded for flycheck faces
   (require 'lsp-diagnostics)
 
+  ;; Define missing lsp-flycheck faces and error levels
+  (unless (facep 'lsp-flycheck-error-unnecessary)
+    (defface lsp-flycheck-error-unnecessary
+      '((t :strike-through t :inherit font-lock-comment-face))
+      "Face for unnecessary code."
+      :group 'lsp-faces))
+
+  ;; Register the error level with flycheck when it loads
+  (with-eval-after-load 'flycheck
+    (when (boundp 'flycheck-error-levels)
+      (unless (assq 'lsp-flycheck-error-unnecessary flycheck-error-levels)
+        (flycheck-define-error-level 'lsp-flycheck-error-unnecessary
+          :severity 'warning
+          :compilation-level 1
+          :overlay-category 'flycheck-warning-overlay
+          :fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
+          :fringe-face 'flycheck-fringe-warning
+          :error-list-face 'flycheck-error-list-warning))))
+
   ;; File watching ignore patterns
   (setq lsp-file-watch-ignored-directories
         (append lsp-file-watch-ignored-directories
@@ -237,7 +258,20 @@
 ;;; Language-Specific LSP Servers
 ;;; ----------------------------------------------------------------
 
-;;  TODO
+;; Configure TypeScript language server and silence volar
+(with-eval-after-load 'lsp-mode
+  ;; Silence all volar messages
+  (defun lsp-volar--activate-p (&rest _)
+    "Override volar activation to always return nil."
+    nil)
+
+  ;; Ensure volar is never activated
+  (with-eval-after-load 'lsp-volar
+    (setq lsp-volar-take-over-mode nil)
+    (setq lsp-volar-hybrid-mode nil))
+
+  ;; Disable company-mode warnings
+  (setq lsp-completion-provider :none))
 
 ;;; ================================================================
 ;;; TREE-SITTER CONFIGURATION
@@ -258,15 +292,11 @@
                       ;; (cmake "https://github.com/uyha/tree-sitter-cmake")
                       ;; TODO: C++ language support
                       ;; (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
-                      ;; TODO: CSS language support
-                      ;; (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
+                      (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
                       (elisp "https://github.com/Wilfred/tree-sitter-elisp")
-                      ;; TODO: HTML language support
-                      ;; (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
-                      ;; TODO: JavaScript language support
-                      ;; (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
-                      ;; TODO: JSON language support
-                      ;; (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
+                      (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
+                      (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
+                      (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
                       (python . ("https://github.com/tree-sitter/tree-sitter-python" "v0.20.4"))
                       ;; TODO: Make language support
                       ;; (make "https://github.com/alemuller/tree-sitter-make")
@@ -274,10 +304,8 @@
                       ;; (markdown "https://github.com/ikatyang/tree-sitter-markdown")
                       ;; TODO: TOML language support
                       ;; (toml "https://github.com/tree-sitter/tree-sitter-toml")
-                      ;; TODO: TSX language support
-                      ;; (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
-                      ;; TODO: TypeScript language support
-                      ;; (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))
+                      (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
+                      (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))
                       ;; TODO: YAML language support
                       ;; (yaml . ("https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0"))
                       )))
@@ -297,15 +325,11 @@
   "Configure major mode remapping for tree-sitter modes."
   (when (and (fboundp 'treesit-available-p)
              (boundp 'major-mode-remap-alist))
-    (let ((mode-mappings '(;; TODO: Re-enable TypeScript mode remapping after Python is perfected
-                           ;; (typescript-mode . typescript-ts-mode)
-                           ;; TODO: Re-enable JavaScript mode remapping after Python is perfected
-                           ;; (js-mode . js-ts-mode)
-                           ;; (js2-mode . js-ts-mode)
-                           ;; TODO: Re-enable JSON mode remapping after Python is perfected
-                           ;; (json-mode . json-ts-mode)
-                           ;; (js-json-mode . json-ts-mode)
-                           )))
+    (let ((mode-mappings '((typescript-mode . typescript-ts-mode)
+                           (js-mode . js-ts-mode)
+                           (js2-mode . js-ts-mode)
+                           (json-mode . json-ts-mode)
+                           (js-json-mode . json-ts-mode))))
       (dolist (mapping mode-mappings)
         (add-to-list 'major-mode-remap-alist mapping)))))
 
@@ -316,21 +340,14 @@
 (defun my/setup-treesitter-auto-modes ()
   "Configure file associations for tree-sitter modes."
   (when (fboundp 'treesit-available-p)
-    (let ((file-associations '(;; TODO: TSX file associations
-                               ;; ("\\.tsx\\'" . tsx-ts-mode)
-                               ;; TODO: JavaScript file associations
-                               ;; ("\\.js\\'" . js-ts-mode)
-                               ;; ("\\.mjs\\'" . js-ts-mode)
-                               ;; ("\\.mts\\'" . typescript-ts-mode)
-                               ;; ("\\.cjs\\'" . js-ts-mode)
-                               ;; TODO: TypeScript file associations
-                               ;; ("\\.ts\\'" . typescript-ts-mode)
-                               ;; ("\\.jsx\\'" . tsx-ts-mode)
-                               ;; TODO: JSON file associations
-                               ;; ("\\.json\\'" . json-ts-mode)
-                               ;; TODO: Dockerfile associations
-                               ;; ("\\.Dockerfile\\'" . dockerfile-ts-mode)
-                               )))
+    (let ((file-associations '(("\\.tsx\\'" . tsx-ts-mode)
+                               ("\\.ts\\'" . typescript-ts-mode)
+                               ("\\.jsx\\'" . tsx-ts-mode)
+                               ("\\.js\\'" . js-ts-mode)
+                               ("\\.mjs\\'" . js-ts-mode)
+                               ("\\.mts\\'" . typescript-ts-mode)
+                               ("\\.cjs\\'" . js-ts-mode)
+                               ("\\.json\\'" . json-ts-mode))))
       (dolist (association file-associations)
         (add-to-list 'auto-mode-alist association)))))
 
@@ -404,8 +421,16 @@
     ;; Configure Elisp formatting
     (setf (alist-get 'emacs-lisp-mode apheleia-mode-alist) 'lisp-indent)
 
-    ;; TODO: Configure TypeScript/JavaScript with prettier, eslint, apheleia
-    ;; N.B. ++ Volta support
+    ;; Configure TypeScript/JavaScript formatters with Prettier
+    ;; Use yarn to run prettier from project's node_modules
+    (setf (alist-get 'prettier apheleia-formatters)
+          '("yarn" "prettier" "--stdin-filepath" filepath))
+
+    ;; Configure mode associations for TypeScript/JavaScript files
+    (setf (alist-get 'typescript-ts-mode apheleia-mode-alist) 'prettier)
+    (setf (alist-get 'tsx-ts-mode apheleia-mode-alist) 'prettier)
+    (setf (alist-get 'js-ts-mode apheleia-mode-alist) 'prettier)
+    (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'prettier)
 
     ;; Key bindings for manual formatting
     (global-set-key (kbd "C-c f") #'apheleia-format-buffer)
@@ -438,7 +463,53 @@
 ;;; LANGUAGE SUPPORT - JAVASCRIPT/TYPESCRIPT
 ;;; ================================================================
 
-;; TODO: TypeScript/JavaScript language support
+(defun my/setup-typescript-development ()
+  "Configure TypeScript/JavaScript development environment for current buffer."
+  ;; Enable minor modes first
+  (yas-minor-mode 1)
+
+  ;; Ensure flycheck is loaded before lsp-diagnostics
+  (when (package-installed-p 'flycheck)
+    (require 'flycheck nil t))
+
+  ;; Disable company-mode integration
+  (setq lsp-completion-provider :capf)
+
+  ;; Start LSP
+  (lsp-deferred)
+
+  ;; Setup completion after LSP loaded
+  (add-hook 'lsp-mode-hook
+            (lambda ()
+              (when (or (eq major-mode 'typescript-ts-mode)
+                        (eq major-mode 'tsx-ts-mode)
+                        (eq major-mode 'js-ts-mode))
+                ;; Confirm completion-at-point-functions set up correctly
+                (setq-local completion-at-point-functions
+                            (list #'lsp-completion-at-point))
+
+                ;; Use Corfu with Cape if available
+                (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
+                  ;; Ensure cape loaded before using its functions
+                  (require 'cape nil t)
+                  ;; Add cape functions to enhance completion
+                  (when (fboundp 'cape-yasnippet)
+                    (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+                  (when (fboundp 'cape-dabbrev)
+                    (add-to-list 'completion-at-point-functions #'cape-dabbrev t))
+                  (when (fboundp 'cape-file)
+                    (add-to-list 'completion-at-point-functions #'cape-file t)))))
+            nil t)
+
+  ;; Setup debugging (optional - only if needed)
+  ;; To install debug adapter: M-x dap-node-setup
+  (when (package-installed-p 'dap-mode)
+    (require 'dap-node nil t)))
+
+;; Hook integration for TypeScript/JavaScript modes
+(add-hook 'typescript-ts-mode-hook #'my/setup-typescript-development)
+(add-hook 'tsx-ts-mode-hook #'my/setup-typescript-development)
+(add-hook 'js-ts-mode-hook #'my/setup-typescript-development)
 
 ;;; ================================================================
 ;;; LANGUAGE SUPPORT - PYTHON
@@ -619,7 +690,16 @@ Otherwise, perform default deactivation behavior."
      "a4340c197a450c77c729cad236b5f3ca88aaf974e91a7af2d2e7ae7bb5f96720"
      "6b20d669fcbcd79c6d0f3db36a71af1b88763246d3550a0c361866adecb38a9e"
      default))
- '(package-selected-packages nil))
+ '(package-selected-packages nil)
+ '(safe-local-variable-values
+   '((lsp-typescript-suggest-auto-imports . t)
+     (lsp-typescript-format-enable)
+     (lsp-typescript-preferences-quote-style . "single")
+     (eval when (executable-find "node")
+           (setenv "NODE_PATH"
+                   (expand-file-name "node_modules" default-directory)))
+     (eval setq-local lsp-server-install-dir
+           (expand-file-name "node_modules" default-directory)))))
 
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
