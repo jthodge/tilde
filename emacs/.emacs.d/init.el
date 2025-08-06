@@ -5,13 +5,13 @@
 ;;; ================================================================
 
 ;; Suppress obsolete warnings from package dependencies
-;; N.B. Upstream `cl` is the offending dependency package
+;; N.B. Upstream `cl` is offending dependency package
 (setq byte-compile-warnings '(not obsolete))
 
-;; Add cargo bin to exec-path for tools like emacs-lsp-booster
-(let ((cargo-bin (expand-file-name "~/.cargo/bin")))
-  (when (file-directory-p cargo-bin)
-    (add-to-list 'exec-path cargo-bin)))
+;; TODO: Add cargo bin to exec-path for tools e.g. emacs-lsp-booster
+;; (let ((cargo-bin (expand-file-name "~/.cargo/bin")))
+;;   (when (file-directory-p cargo-bin)
+;;     (add-to-list 'exec-path cargo-bin)))
 
 (load "~/.emacs.d/scripts.el")
 
@@ -19,7 +19,7 @@
 ;;; CORE UI CONFIGURATION
 ;;; ================================================================
 
-;; Basic UI cleanup
+;; UI cleanup
 (menu-bar-mode 0)
 (setq inhibit-startup-screen t)
 (column-number-mode)
@@ -118,7 +118,7 @@
 ;;; PERFORMANCE OPTIMIZATIONS
 ;;; ================================================================
 
-;; Increase the amount of data Emacs reads from processes
+;; Increase amount of data Emacs reads from processes
 (setq read-process-output-max (* 1024 1024)) ;; 1mb
 
 ;; Optimize garbage collection thresholds
@@ -138,7 +138,7 @@
 ;;; ----------------------------------------------------------------
 
 ;; Disable plists for compatibility with updated lsp-mode
-;; The updated lsp-mode may have changed plist handling
+;; Current lsp-mode may have changed plist handling...
 (setenv "LSP_USE_PLISTS" nil)
 
 ;; Ensure lsp-use-plists is disabled
@@ -225,9 +225,6 @@
                   "[/\\\\]node_modules\\'"
                   "[/\\\\]\\.DS_Store\\'")))
 
-  ;; Remove custom lsp-completion--enable function - let LSP handle completion setup
-  ;; The custom function was interfering with proper completion initialization
-
   ;; Consult integration
   (define-key lsp-mode-map [remap lsp-treemacs-errors-list] #'consult-lsp-diagnostics)
   (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols)
@@ -239,32 +236,7 @@
 ;;; Language-Specific LSP Servers
 ;;; ----------------------------------------------------------------
 
-;; TODO: Re-enable ESLint Language Server for TypeScript/JavaScript after Python is perfected
-;; (with-eval-after-load 'lsp-mode
-;;   (lsp-register-client
-;;    (make-lsp-client
-;;     :new-connection (lsp-stdio-connection
-;;                      (lambda ()
-;;                        (list "/Users/jth/.volta/bin/vscode-eslint-language-server" "--stdio")))
-;;     :activation-fn (lsp-activate-on "typescript" "javascript" "javascriptreact"
-;;                                     "typescriptreact" "javascript.jsx" "typescript.tsx")
-;;     :server-id 'eslint-lsp
-;;     :priority -1
-;;     :add-on? t
-;;     :multi-root t
-;;     :initialization-options
-;;     (lambda ()
-;;       (list :nodePath "/Users/jth/.volta/bin/node"
-;;             :quiet :json-false
-;;             :rulesCustomizations []
-;;             :run "onType"
-;;             :validate "on"
-;;             :packageManager "npm"
-;;             :codeActionOnSave (list :mode "all" :rules [])
-;;             :format :json-false
-;;             :onIgnoredFiles "off"
-;;             :problems (list :shortenToSingleLine :json-false)
-;;             :workingDirectory (list :mode "auto"))))))
+;;  TODO
 
 ;;; ================================================================
 ;;; TREE-SITTER CONFIGURATION
@@ -279,34 +251,34 @@
   (interactive)
   (when (and (fboundp 'treesit-install-language-grammar)
              (boundp 'treesit-language-source-alist))
-    (let ((grammars '(;; TODO: Re-enable C language support after Python is perfected
+    (let ((grammars '(;; TODO: C language support
                       ;; (c "https://github.com/tree-sitter/tree-sitter-c")
-                      ;; TODO: Re-enable CMake language support after Python is perfected
+                      ;; TODO: CMake language support
                       ;; (cmake "https://github.com/uyha/tree-sitter-cmake")
-                      ;; TODO: Re-enable C++ language support after Python is perfected
+                      ;; TODO: C++ language support
                       ;; (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
-                      ;; TODO: Re-enable CSS language support after Python is perfected
+                      ;; TODO: CSS language support
                       ;; (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
-                      ;; TODO: Re-enable Elisp language support after Python is perfected
+                      ;; TODO: Elisp language support
                       ;; (elisp "https://github.com/Wilfred/tree-sitter-elisp")
-                      ;; TODO: Re-enable HTML language support after Python is perfected
+                      ;; TODO: HTML language support
                       ;; (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
-                      ;; TODO: Re-enable JavaScript language support after Python is perfected
+                      ;; TODO: JavaScript language support
                       ;; (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
-                      ;; TODO: Re-enable JSON language support after Python is perfected
+                      ;; TODO: JSON language support
                       ;; (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
                       (python . ("https://github.com/tree-sitter/tree-sitter-python" "v0.20.4"))
-                      ;; TODO: Re-enable Make language support after Python is perfected
+                      ;; TODO: Make language support
                       ;; (make "https://github.com/alemuller/tree-sitter-make")
-                      ;; TODO: Re-enable Markdown language support after Python is perfected
+                      ;; TODO: Markdown language support
                       ;; (markdown "https://github.com/ikatyang/tree-sitter-markdown")
-                      ;; TODO: Re-enable TOML language support after Python is perfected
+                      ;; TODO: TOML language support
                       ;; (toml "https://github.com/tree-sitter/tree-sitter-toml")
-                      ;; TODO: Re-enable TSX language support after Python is perfected
+                      ;; TODO: TSX language support
                       ;; (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))
-                      ;; TODO: Re-enable TypeScript language support after Python is perfected
+                      ;; TODO: TypeScript language support
                       ;; (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))
-                      ;; TODO: Re-enable YAML language support after Python is perfected
+                      ;; TODO: YAML language support
                       ;; (yaml . ("https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0"))
                       )))
       (dolist (grammar grammars)
@@ -328,8 +300,8 @@
     (let ((mode-mappings '(;; TODO: Re-enable TypeScript mode remapping after Python is perfected
                            ;; (typescript-mode . typescript-ts-mode)
                            ;; TODO: Re-enable JavaScript mode remapping after Python is perfected
-                           ;; (js-mode . typescript-ts-mode)
-                           ;; (js2-mode . typescript-ts-mode)
+                           ;; (js-mode . js-ts-mode)
+                           ;; (js2-mode . js-ts-mode)
                            ;; TODO: Re-enable JSON mode remapping after Python is perfected
                            ;; (json-mode . json-ts-mode)
                            ;; (js-json-mode . json-ts-mode)
@@ -344,19 +316,19 @@
 (defun my/setup-treesitter-auto-modes ()
   "Configure file associations for tree-sitter modes."
   (when (fboundp 'treesit-available-p)
-    (let ((file-associations '(;; TODO: Re-enable TSX file associations after Python is perfected
+    (let ((file-associations '(;; TODO: TSX file associations
                                ;; ("\\.tsx\\'" . tsx-ts-mode)
-                               ;; TODO: Re-enable JavaScript file associations after Python is perfected
-                               ;; ("\\.js\\'" . typescript-ts-mode)
-                               ;; ("\\.mjs\\'" . typescript-ts-mode)
+                               ;; TODO: JavaScript file associations
+                               ;; ("\\.js\\'" . js-ts-mode)
+                               ;; ("\\.mjs\\'" . js-ts-mode)
                                ;; ("\\.mts\\'" . typescript-ts-mode)
-                               ;; ("\\.cjs\\'" . typescript-ts-mode)
-                               ;; TODO: Re-enable TypeScript file associations after Python is perfected
+                               ;; ("\\.cjs\\'" . js-ts-mode)
+                               ;; TODO: TypeScript file associations
                                ;; ("\\.ts\\'" . typescript-ts-mode)
                                ;; ("\\.jsx\\'" . tsx-ts-mode)
-                               ;; TODO: Re-enable JSON file associations after Python is perfected
+                               ;; TODO: JSON file associations
                                ;; ("\\.json\\'" . json-ts-mode)
-                               ;; TODO: Re-enable Dockerfile associations after Python is perfected
+                               ;; TODO: Dockerfile associations
                                ;; ("\\.Dockerfile\\'" . dockerfile-ts-mode)
                                )))
       (dolist (association file-associations)
@@ -429,25 +401,8 @@
     (setf (alist-get 'python-mode apheleia-mode-alist) 'ruff)
     (setf (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff)
 
-    ;; TODO: Re-enable non-Python formatters after Python is perfected
-    ;; (setf (alist-get 'prettier-volta apheleia-formatters)
-    ;;       '("/Users/jth/.volta/bin/prettier"
-    ;;         "--stdin-filepath" filepath
-    ;;         (apheleia-formatters-locate-file ".prettierrc.js" ".prettierrc.json" ".prettierrc.yml" ".prettierrc.yaml" ".prettierrc")))
-    ;; (setf (alist-get 'eslint-volta apheleia-formatters)
-    ;;       '("/Users/jth/.volta/bin/eslint"
-    ;;         "--stdin-filename" filepath
-    ;;         "--fix-dry-run"
-    ;;         "--format" "json"
-    ;;         "--stdin"))
-    ;; (setf (alist-get 'typescript-ts-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'tsx-ts-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'typescript-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'js-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'js2-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'javascript-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'json-mode apheleia-mode-alist) 'prettier-volta)
-    ;; (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'prettier-volta)
+    ;; TODO: Configure TypeScript/JavaScript with prettier, eslint, apheleia
+    ;; N.B. ++ Volta support
 
     ;; Key bindings for manual formatting
     (global-set-key (kbd "C-c f") #'apheleia-format-buffer)
@@ -458,7 +413,7 @@
     ;; Enable global mode
     (apheleia-global-mode 1))
 
-  ;; Load the package
+  ;; Load package
   (require 'apheleia nil t))
 
 ;; Snippets
@@ -475,6 +430,12 @@
 ;; Org mode keybindings (prevent conflicts with lsp-mode)
 (global-set-key (kbd "C-c o l") #'org-store-link)
 (global-set-key (kbd "C-c o b") #'org-switchb)
+
+;;; ================================================================
+;;; LANGUAGE SUPPORT - JAVASCRIPT/TYPESCRIPT
+;;; ================================================================
+
+;; TODO: TypeScript/JavaScript language support
 
 ;;; ================================================================
 ;;; LANGUAGE SUPPORT - PYTHON
@@ -496,7 +457,7 @@
   (setq-local python-shell-interpreter (executable-find "python"))
 
   ;; Start LSP
-  (require 'lsp-pyright) ; TODO: Consider replacing with mypy-based LSP alternative for better type checking
+  (require 'lsp-pyright) ; TODO: Consider replacing with mypy-based LSP alternative
   (lsp-deferred)
 
   ;; Setup completion after LSP is loaded
@@ -527,31 +488,6 @@
 
 (add-hook 'python-mode-hook #'my/setup-python-development)
 
-;;; ================================================================
-;;; LANGUAGE SUPPORT - TYPESCRIPT/JAVASCRIPT (DISABLED FOR PYTHON FOCUS)
-;;; ================================================================
-
-;; TODO: Re-enable TypeScript/JavaScript language support after Python is perfected
-;; (defun my/setup-typescript-development ()
-;;   "Configure TypeScript/JavaScript development environment for current buffer."
-;;   ;; Use Corfu with Cape if available
-;;   (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
-;;     ;; Ensure cape is loaded before using its functions
-;;     (require 'cape nil t)
-;;     ;; Add yasnippet support via Cape only if the function exists
-;;     (when (fboundp 'cape-yasnippet)
-;;       (add-to-list 'completion-at-point-functions #'cape-yasnippet t)))
-
-;;   (lsp-deferred)
-;;   (yas-minor-mode 1)
-;;   (when (fboundp 'dap-mode)
-;;     (dap-mode 1)))
-
-;; (add-hook 'typescript-ts-mode-hook #'my/setup-typescript-development)
-;; (add-hook 'tsx-ts-mode-hook #'my/setup-typescript-development)
-;; (add-hook 'typescript-mode-hook #'my/setup-typescript-development)
-
-;;; ================================================================
 ;;; ================================================================
 ;;; UV PYTHON ENVIRONMENT MANAGEMENT
 ;;; ================================================================
@@ -647,13 +583,3 @@ Otherwise, perform default deactivation behavior."
  ;; If there is more than one, they won't work right.
  )
 
-;;; ================================================================
-;;; EXTERNAL INTEGRATIONS
-;;; ================================================================
-
-;; Development testing utilities
-(load-file "~/.emacs.d/test-lsp-booster.el")
-(load-file "~/.emacs.d/test-corfu-migration.el")
-(load-file "~/.emacs.d/test-apheleia.el")
-;; TODO: Re-enable non-Python test files after Python is perfected
-;; (load-file "~/.emacs.d/test-eslint-lsp.el")
