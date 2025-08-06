@@ -96,6 +96,7 @@
     corfu                  ; Modern completion frontend
     dap-mode               ; Debug Adapter Protocol Support
     flycheck               ; Linting and syntax checker
+    flycheck-package       ; Elisp package linting for MELPA standards
     lsp-mode               ; Language Server Protocol support
     lsp-pyright            ; Language Server Protocol client using pyright Python Language Server
     lsp-ui                 ; UI improvements for `lsp-mode`
@@ -259,8 +260,7 @@
                       ;; (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
                       ;; TODO: CSS language support
                       ;; (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
-                      ;; TODO: Elisp language support
-                      ;; (elisp "https://github.com/Wilfred/tree-sitter-elisp")
+                      (elisp "https://github.com/Wilfred/tree-sitter-elisp")
                       ;; TODO: HTML language support
                       ;; (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
                       ;; TODO: JavaScript language support
@@ -401,6 +401,9 @@
     (setf (alist-get 'python-mode apheleia-mode-alist) 'ruff)
     (setf (alist-get 'python-ts-mode apheleia-mode-alist) 'ruff)
 
+    ;; Configure Elisp formatting
+    (setf (alist-get 'emacs-lisp-mode apheleia-mode-alist) 'lisp-indent)
+
     ;; TODO: Configure TypeScript/JavaScript with prettier, eslint, apheleia
     ;; N.B. ++ Volta support
 
@@ -487,6 +490,48 @@
   (dap-mode 1))
 
 (add-hook 'python-mode-hook #'my/setup-python-development)
+
+;;; ================================================================
+;;; LANGUAGE SUPPORT - ELISP
+;;; ================================================================
+
+(defun my/setup-elisp-development ()
+  "Configure Elisp development environment for current buffer."
+  ;; Enable minor modes
+  (yas-minor-mode 1)
+
+  ;; Enable linting with flycheck and package-lint
+  (when (package-installed-p 'flycheck)
+    (require 'flycheck nil t)
+    (flycheck-mode 1)
+
+    ;; Enable package-lint if available
+    (when (package-installed-p 'flycheck-package)
+      (require 'flycheck-package nil t)
+      (flycheck-package-setup)))
+
+  ;; No LSP needed - Emacs provides all completion/navigation natively
+  ;; Enhanced completion with Cape
+  (when (package-installed-p 'cape)
+    (require 'cape nil t)
+    ;; Use built-in elisp completion as primary
+    (setq-local completion-at-point-functions
+                (list #'elisp-completion-at-point))
+    ;; Add Cape enhancements
+    (when (fboundp 'cape-yasnippet)
+      (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+    (when (fboundp 'cape-dabbrev)
+      (add-to-list 'completion-at-point-functions #'cape-dabbrev t)))
+
+  ;; Enable checkdoc for documentation linting
+  (when (package-installed-p 'flycheck)
+    (add-hook 'flycheck-mode-hook
+              (lambda ()
+                (when (eq major-mode 'emacs-lisp-mode)
+                  (setq-local flycheck-checkers
+                              (append flycheck-checkers '(emacs-lisp-checkdoc))))))))
+
+(add-hook 'emacs-lisp-mode-hook #'my/setup-elisp-development)
 
 ;;; ================================================================
 ;;; UV PYTHON ENVIRONMENT MANAGEMENT
