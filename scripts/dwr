@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+# Delete workflow runs - dwr
+
+# Given "owner/repo" name, e.g. "$OWNER/$REPO", retrieve workflow runs
+# for repo and present them list. Selected runs will be deleted.
+# Consumes GitHub API.
+
+# Requires:
+# - gh
+# - jq
+
+set -o errexit
+set -o pipefail
+
+if [[ -z "$1" ]]; then
+  read -p "Enter owner value: " owner
+  read -p "Enter repo value: " repo_name
+  declare repo="$owner/$repo_name"
+else
+  declare repo="$1"
+fi
+
+jqscript() {
+
+    cat <<EOF
+      def symbol:
+        sub("skipped"; "SKIP") |
+        sub("success"; "GOOD") |
+        sub("failure"; "FAIL");
+
+      def tz:
+        gsub("[TZ]"; " ");
+
+
+      .workflow_runs[]
+        | [
+            (.conclusion | symbol),
+            (.created_at | tz),
+            .id,
+            .event,
+            .name
+          ]
+        | @tsv
+EOF
+
+}
+
+selectruns() {
+
+  gh api --paginate "/repos/$repo/actions/runs" \
+    | jq -r -f <(jqscript) \
+    | fzf --multi
+
+}
+
+deleterun() {
+
+  local run id result
+  run=$1
+  id="$(cut -f 3 <<< "$run")"
+  gh api -X DELETE "/repos/$repo/actions/runs/$id"
+  [[ $? = 0 ]] && result="OK!" || result="BAD"
+  printf "%s\t%s\n" "$result" "$run"
+
+}
+
+deleteruns() {
+
+  local id
+  while read -r run; do
+    deleterun "$run"
+    sleep 0.25
+  done
+
+}
+
+usage() {
+  echo "Usage: $0 [owner/repo]"
+  echo "  owner/repo: Repository (if not provided, you'll be prompted for owner and repo)"
+  echo ""
+  echo "Examples:"
+  echo "  $0                    # Prompts for owner and repo"
+  echo "  $0 myuser/myrepo      # All workflow runs for specific repo"
+  echo ""
+  echo "Use fzf to search and filter workflow runs interactively"
+}
+
+main() {
+
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    usage
+    exit 0
+  fi
+
+  selectruns | deleteruns
+
+}
+
+main "$@"

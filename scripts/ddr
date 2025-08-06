@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+
+# Delete deployment records - ddr
+
+# Given "owner/repo" name e.g. "$OWNER/$REPO", retrieve deployment records for
+# repo and present in list. Selected deployments will be deleted.
+# Consues GitHub API.
+
+# Requires:
+# - gh
+# - jq
+
+# N.B.: This deletes deployment RECORDS only, not environments
+
+set -o errexit
+set -o pipefail
+
+if [[ -z "$1" ]]; then
+  read -p "Ente owner value: " owner
+  read -p "Enter repo value: " repo_name
+  declare repo="$owner/$repo_name"
+else
+  declare repo="$1"
+fi
+
+jqscript() {
+
+    cat <<EOF
+      def state:
+        sub("success"; "GOOD") |
+        sub("failure"; "FAIL") |
+        sub("error"; "ERR ") |
+        sub("pending"; "PEND") |
+        sub("in_progress"; "PROG") |
+        sub("inactive"; "INAC") |
+        sub("queued"; "QUER");
+
+      def tz:
+        gsub("[TZ]"; " ");
+
+      .[]
+        | [
+            (.statuses[0].state // "unknown" | state),
+            (.created_at | tz),
+            .id,
+            .environment,
+            (.description // "no description"),
+            .ref
+          ]
+        | @tsv
+EOF
+
+}
+
+selectdeployments() {
+
+  gh api --paginate "/repos/$repo/deployments" \
+    | jq -r -f <(jqscript) \
+    | fzf --multi
+
+}
+
+deletedeployment() {
+
+  local deployment id result
+  deployment=$1
+  id="$(cut -f 3 <<< "$deployment")"
+
+  # First, set all deployment statuses to inactive before deleting deployment
+  gh api -X POST "/repos/$repo/deployments/$id/statuses" \
+    -f state=inactive \
+    -f description="Marked inactive for deletion" > /dev/null 2>&1
+
+  # Small delay to ensure the status update is processed
+  sleep 0.5
+
+  # Now delete the deployment
+  gh api -X DELETE "/repos/$repo/deployments/$id"
+  [[ $? = 0 ]] && result="OK!" || result="BAD"
+  printf "%s\t%s\n" "$result" "$deployment"
+
+}
+
+deletedeployments() {
+
+  local deployment
+  while read -r deployment; do
+    deletedeployment "$deployment"
+    sleep 0.5
+  done
+
+}
+
+usage() {
+  echo "Usage: $0 [owner/repo]"
+  echo "  owner/repo: Repository (if not provided, you'll be prompted for owner and repo)"
+  echo ""
+  echo "Examples:"
+  echo "  $0                    # Prompts for owner and repo"
+  echo "  $0 myuser/myrepo      # All deployments for specific repo"
+  echo ""
+  echo "Use fzf to search and filter deployments interactively"
+}
+
+main() {
+
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    usage
+    exit 0
+  fi
+
+  selectdeployments | deletedeployments
+
+}
+
+main "$@"
