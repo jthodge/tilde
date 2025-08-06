@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: defgroup
+# key: defgroup
+# --
+(defgroup $1 nil
+  "$2"
+  :group '$3)

@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: autoload
+# key: autoload
+# --
+;;;###autoload
+(defun $1 ($2)
+  "$3"
+  $0)
