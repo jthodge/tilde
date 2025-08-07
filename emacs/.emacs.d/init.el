@@ -13,6 +13,13 @@
 ;;   (when (file-directory-p cargo-bin)
 ;;     (add-to-list 'exec-path cargo-bin)))
 
+;; Add Go bin to exec-path for development tools
+(let ((go-bin (expand-file-name "~/go/bin")))
+  (when (file-directory-p go-bin)
+    (add-to-list 'exec-path go-bin)
+    ;; Also update PATH environment variable for subprocesses
+    (setenv "PATH" (concat go-bin path-separator (getenv "PATH")))))
+
 (load "~/.emacs.d/scripts.el")
 
 ;;; ================================================================
@@ -97,6 +104,7 @@
     dap-mode               ; Debug Adapter Protocol Support
     flycheck               ; Linting and syntax checker
     flycheck-package       ; Elisp package linting for MELPA standards
+    go-mode                ; Go editing support
     lsp-mode               ; Language Server Protocol support
     lsp-pyright            ; Language Server Protocol client using pyright Python Language Server
     lsp-ui                 ; UI improvements for `lsp-mode`
@@ -273,6 +281,40 @@
   ;; Disable company-mode warnings
   (setq lsp-completion-provider :none))
 
+;; Configure Go language server (gopls)
+(with-eval-after-load 'lsp-mode
+  ;; Configure gopls settings for single-module projects with future multi-module support
+  (lsp-register-client
+   (make-lsp-client
+    :new-connection (lsp-stdio-connection "gopls")
+    :activation-fn (lsp-activate-on "go")
+    :server-id 'gopls
+    :initialization-options
+    '(:buildFlags []
+                  :env nil
+                  :directoryFilters []
+                  :templateExtensions []
+                  :memoryMode ""
+                  :analyses (:fieldalignment t
+                                             :nilness t
+                                             :unusedparams t
+                                             :unusedwrite t)
+                  :staticcheck t
+                  :codelenses (:gc_details t
+                                           :generate t
+                                           :regenerate_cgo t
+                                           :test t
+                                           :tidy t
+                                           :upgrade_dependency t
+                                           :vendor t))))
+
+  ;; Configure Go imports and formatting hooks
+  (defun lsp-go-install-save-hooks ()
+    (add-hook 'before-save-hook #'lsp-format-buffer t t)
+    (add-hook 'before-save-hook #'lsp-organize-imports t t))
+
+  (add-hook 'go-mode-hook #'lsp-go-install-save-hooks))
+
 ;;; ================================================================
 ;;; TREE-SITTER CONFIGURATION
 ;;; ================================================================
@@ -294,6 +336,8 @@
                       ;; (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
                       (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))
                       (elisp "https://github.com/Wilfred/tree-sitter-elisp")
+                      ;; TODO: Go language support
+                      ;; (go . ("https://github.com/tree-sitter/tree-sitter-go" "v0.20.0"))
                       (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))
                       (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.21.2" "src"))
                       (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.20.2"))
@@ -325,7 +369,8 @@
   "Configure major mode remapping for tree-sitter modes."
   (when (and (fboundp 'treesit-available-p)
              (boundp 'major-mode-remap-alist))
-    (let ((mode-mappings '((typescript-mode . typescript-ts-mode)
+    (let ((mode-mappings '(;; TODO: (go-mode . go-ts-mode)
+                           (typescript-mode . typescript-ts-mode)
                            (js-mode . js-ts-mode)
                            (js2-mode . js-ts-mode)
                            (json-mode . json-ts-mode)
@@ -340,7 +385,8 @@
 (defun my/setup-treesitter-auto-modes ()
   "Configure file associations for tree-sitter modes."
   (when (fboundp 'treesit-available-p)
-    (let ((file-associations '(("\\.tsx\\'" . tsx-ts-mode)
+    (let ((file-associations '(;; TODO: ("\\.go\\'" . go-ts-mode)
+                               ("\\.tsx\\'" . tsx-ts-mode)
                                ("\\.ts\\'" . typescript-ts-mode)
                                ("\\.jsx\\'" . tsx-ts-mode)
                                ("\\.js\\'" . js-ts-mode)
@@ -421,6 +467,13 @@
     ;; Configure Elisp formatting
     (setf (alist-get 'emacs-lisp-mode apheleia-mode-alist) 'lisp-indent)
 
+    ;; Configure Go formatter
+    (setf (alist-get 'gofmt apheleia-formatters)
+          '("gofmt"))
+
+    ;; Configure mode associations for Go files
+    (setf (alist-get 'go-mode apheleia-mode-alist) 'gofmt)
+
     ;; Configure TypeScript/JavaScript formatters with Prettier
     ;; Use yarn to run prettier from project's node_modules
     (setf (alist-get 'prettier apheleia-formatters)
@@ -450,6 +503,26 @@
 
 ;; Debug Adapter Protocol
 (setopt dap-auto-configure-mode t)
+
+;; Go debugging configuration
+(with-eval-after-load 'dap-mode
+  (require 'dap-dlv-go nil t)
+
+  ;; Configure delve path
+  (setq dap-dlv-go-delve-path (executable-find "dlv"))
+
+  ;; Register Go debug templates
+  (dap-register-debug-template
+   "Go Debug"
+   (list :type "go"
+         :request "launch"
+         :name "Go Debug"
+         :mode "auto"
+         :program nil
+         :buildFlags nil
+         :args nil
+         :env nil
+         :envFile nil)))
 
 ;;; ================================================================
 ;;; KEYBINDINGS
@@ -561,6 +634,56 @@
   (dap-mode 1))
 
 (add-hook 'python-mode-hook #'my/setup-python-development)
+
+;;; ================================================================
+;;; LANGUAGE SUPPORT - GO
+;;; ================================================================
+
+(add-to-list 'auto-mode-alist '("\\.go\\'" . go-mode))
+
+(defun my/setup-go-development ()
+  "Configure Go development environment for current buffer."
+  ;; Enable minor modes first
+  (yas-minor-mode 1)
+
+  ;; Ensure flycheck is loaded before LSP
+  (when (package-installed-p 'flycheck)
+    (require 'flycheck nil t))
+
+  ;; Configure Go-specific settings
+  (setq-local tab-width 4)
+  (setq-local indent-tabs-mode t) ; Go uses tabs
+
+  ;; Start LSP (gopls will be detected automatically)
+  (lsp-deferred)
+
+  ;; Setup completion after LSP is loaded
+  (add-hook 'lsp-mode-hook
+            (lambda ()
+              (when (eq major-mode 'go-mode)
+                ;; Ensure completion-at-point-functions is set up correctly
+                (setq-local completion-at-point-functions
+                            (list #'lsp-completion-at-point))
+
+                ;; Use Corfu with Cape if available
+                (when (and (package-installed-p 'corfu) (package-installed-p 'cape))
+                  ;; Ensure cape is loaded before using its functions
+                  (require 'cape nil t)
+                  ;; Add cape functions to enhance completion
+                  (when (fboundp 'cape-yasnippet)
+                    (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+                  (when (fboundp 'cape-dabbrev)
+                    (add-to-list 'completion-at-point-functions #'cape-dabbrev t))
+                  (when (fboundp 'cape-file)
+                    (add-to-list 'completion-at-point-functions #'cape-file t)))))
+            nil t)
+
+  ;; Setup debugging with Delve
+  (when (package-installed-p 'dap-mode)
+    (require 'dap-dlv-go nil t)
+    (dap-mode 1)))
+
+(add-hook 'go-mode-hook #'my/setup-go-development)
 
 ;;; ================================================================
 ;;; LANGUAGE SUPPORT - ELISP
