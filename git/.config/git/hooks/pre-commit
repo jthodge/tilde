@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Block commits whose staged content matches known secret patterns.
+# Conservative by design: false positives are preferred over leaks.
+# Bypass only via `git commit --no-verify` after manual review.
+
+set -euo pipefail
+
+declare -a PATTERNS=(
+    'hch-v3-[a-z0-9]{32,}'                     # Honcho v3 API key
+    'sk-ant-[a-zA-Z0-9_-]{32,}'                # Anthropic API key
+    'sk-[a-zA-Z0-9]{40,}'                      # OpenAI / generic sk-
+    'ghp_[a-zA-Z0-9]{36,}'                     # GitHub personal access token
+    'github_pat_[a-zA-Z0-9_]{50,}'             # GitHub fine-grained PAT
+    'AKIA[0-9A-Z]{16}'                         # AWS access key ID
+    'xox[bp]-[0-9]+-[0-9]+-[a-zA-Z0-9-]+'      # Slack bot/user token
+)
+
+staged=$(git diff --cached --no-color -U0)
+
+blocked=0
+for pat in "${PATTERNS[@]}"; do
+    hits=$(printf '%s\n' "$staged" | grep -nE "$pat" || true)
+    if [ -n "$hits" ]; then
+        printf 'pre-commit: blocked — staged content matches /%s/\n' "$pat" >&2
+        printf '%s\n' "$hits" >&2
+        blocked=1
+    fi
+done
+
+if [ "$blocked" -eq 1 ]; then
+    printf '\npre-commit: aborting. Escape only via `git commit --no-verify` after manual review.\n' >&2
+    exit 1
+fi
+
+exit 0

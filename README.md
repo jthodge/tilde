@@ -15,6 +15,14 @@ Each entry in `.stow-packages` (`bash`, `bin`, `emacs`, `git`, `zsh`)
 mirrors a slice of `$HOME`. The `scripts/` directory is intentionally
 not stowed — its contents are invoked in place.
 
+## Hooks
+
+The `git` package ships a staged-secret pre-commit hook at
+`git/.config/git/hooks/pre-commit`. After `stow git`, `~/.gitconfig`
+points `core.hooksPath` at `~/.config/git/hooks`, making the scanner
+active for every commit on this host. Bypass requires the explicit
+`git commit --no-verify` escape after manual review.
+
 ## References
 
 * [Managing dotfiles with GNU stow][stow]

@@ -15,6 +15,7 @@
 [core]
 	editor = /usr/bin/vim
 	pager = delta
+	hooksPath = ~/.config/git/hooks
 [push]
 	default = upstream
 [merge]
