@@ -1,2 +1,21 @@
+# OS metadata
 .DS_Store
+
+# Editor backups and autosaves
 *~
+.#*
+#*#
+*.swp
+*.swo
+
+# sed -i '' artifacts (macOS)
+*-e
+
+# Generic backup/merge artifacts
+*.bak
+*.orig
+*.rej
+
+# IDE workspaces
+.idea/
+.vscode/
