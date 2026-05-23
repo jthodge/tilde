@@ -96,3 +96,9 @@ alias claude="/Users/jth/.claude/local/claude"
 
 
 export GOPATH="$HOME/go"; export GOROOT="$HOME/.go"; export PATH="$GOPATH/bin:$PATH"; # g-install: do NOT edit, see https://github.com/stefanmaric/g
+
+eval "$(mise activate zsh)"
+
+## Honcho
+export HONCHO_API_KEY="$(op read 'op://Personal/Honcho/credential' 2>/dev/null)"
+export HONCHO_PEER_NAME="taylor"
