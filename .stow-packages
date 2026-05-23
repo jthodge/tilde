@@ -2,4 +2,5 @@ bash
 bin
 emacs
 git
+ssh
 zsh
