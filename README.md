@@ -55,6 +55,36 @@ only, often on shared infrastructure) cannot be misused to forge
 "verified" commits in your account, and a hardware-token-bound signing
 key never doubles as an inbound auth vector.
 
+## Pi
+
+Pi is the polyglot agent harness installed alongside Claude Code. Managed
+via Volta for parity with the rest of the JS toolchain:
+
+```sh
+volta install @earendil-works/pi-coding-agent
+```
+
+Volta records the pinned version in its toolchain (visible via
+`volta list`). Pi 0.75+ requires Node ≥ 22.19.0; on older Node, Volta
+will resolve to the latest compatible 0.74.x. Update Node via
+`volta install node@22.19.0` to unlock newer Pi releases.
+
+Authenticate via OAuth subscriptions rather than API keys:
+
+```sh
+pi
+# inside the TUI:
+/login   # pick "Claude Pro/Max", complete browser OAuth
+/login   # pick "ChatGPT Plus/Pro (Codex Subscription)", complete browser OAuth
+```
+
+Tokens land at `~/.pi/agent/auth.json` (runtime state, not tracked).
+
+**Billing note:** third-party harnesses like Pi do not consume Claude
+Pro/Max plan limits. Usage is billed per token as "extra usage" —
+enable at https://claude.ai/settings/usage before invoking Anthropic
+models from Pi.
+
 ## Hooks
 
 The `git` package ships a staged-secret pre-commit hook at

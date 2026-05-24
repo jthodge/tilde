@@ -1,0 +1,35 @@
+{
+  "lastChangelogVersion": "0.74.2",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-4-7",
+  "defaultThinkingLevel": "high",
+  "theme": "modern-dark",
+  "enabledModels": [
+    "claude-opus-4-7",
+    "openai-codex/gpt-5.5"
+  ],
+  "extensions": [
+    "extensions/answer.ts",
+    "extensions/confirm-destructive.ts",
+    "extensions/files.ts",
+    "extensions/notify.ts",
+    "extensions/minimal.ts",
+    "extensions/peon-ping.ts",
+    "extensions/permission-gate.ts",
+    "extensions/plan-mode.ts",
+    "extensions/preset.ts",
+    "extensions/protected-paths.ts",
+    "extensions/review.ts",
+    "extensions/whimsical.ts"
+  ],
+  "skills": [
+    "skills/commit",
+    "skills/github",
+    "skills/native-web-search"
+  ],
+  "packages": [
+    "npm:pi-prompt-template-model@0.6.8"
+  ],
+  "hideThinkingBlock": false,
+  "quietStartup": true
+}
