@@ -36,3 +36,12 @@ Discipline for any agent (human or otherwise) that touches this repo.
 - Per-directory scoped permissions: `<dir>/.claude/settings.local.json`
   narrows the agent surface for work confined to that directory
   (e.g., `scripts/.claude/settings.local.json` for the gh-API tools).
+- Pi harness: `pi/.pi/agent/`. Subagents (scout/planner/worker/
+  reviewer) decompose work by model tier; presets (`plan`, `implement`)
+  toggle model + tool surface; extensions live in
+  `pi/.pi/agent/extensions/`. Authenticated via OAuth subscriptions
+  (`pi /login`), not API keys. See README for install path.
+- Harness-agnostic skill library: `agents/.agents/skills/<name>/SKILL.md`.
+  Any harness following the SKILL.md convention (Pi via its skills
+  loader, Claude Code via plugins) can consume them. Skills are
+  reusable across tool churn — they outlive any single harness.
