@@ -39,6 +39,36 @@ Discipline for any agent (human or otherwise) that touches this repo.
 Both tracked terminals deliberately use Berkeley Mono at size 10 so
 visual state is identical across them.
 
+## Multiplexer
+
+- **tmux** (`tmux/.tmux.conf`) is the in-terminal multiplexer.
+  Prefix is backtick (`` ` ``). Splits: `` `\ `` (vertical),
+  `` `- `` (horizontal). Window navigation: `` `, `` / `` `. `` to
+  cycle, `` `< `` / `` `> `` to reorder. Pane motion via
+  M-h/j/k/l (Alt-h/j/k/l) is unified with Neovim splits through
+  `vim-tmux-navigator` — the same chord crosses tool boundaries.
+- **sesh** (`brew install sesh`) is the session orchestrator.
+  `` `T `` inside tmux opens an fzf-tmux picker over tmux
+  sessions, zoxide directories, git repos, and config dirs. Five
+  ctrl-chord filters narrow the picker (all / tmux / configs /
+  zoxide / find / kill). Sesh has no tracked config — uses
+  sensible defaults.
+- Plugins live at `tmux/.tmux/plugins/`; tpm is a git submodule
+  at `tmux/.tmux/plugins/tpm`. Other plugins are gitignored
+  (TPM installs them at runtime via `prefix + I` on first launch).
+
+## Editors
+
+- **Emacs** (`emacs/.emacs.d/`) is the primary heavy-edit editor.
+- **Neovim** (`nvim/.config/nvim/`) is the fast in-tmux companion.
+  lazy.nvim plugin manager; rose-pine theme (transparent,
+  terminal-synced via OSC 11); snacks.nvim for picker / dashboard
+  / toggles; neogit for in-editor git workflows. Leader is space.
+  M-h/j/k/l navigates splits (same chord as tmux panes via
+  vim-tmux-navigator on both sides).
+- lazy.nvim auto-installs the plugin set from `lazy-lock.json`
+  on first `nvim` launch (pinned commits for reproducibility).
+
 ## Agent stack
 
 - Claude Code config: `claude/.claude/settings.json` (tracked,
