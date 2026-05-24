@@ -19,3 +19,6 @@
 # IDE workspaces
 .idea/
 .vscode/
+
+# tmux runtime plugin state (tpm installs into here; tpm itself is a tracked submodule)
+tmux/.tmux/plugins/*
