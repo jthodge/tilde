@@ -23,3 +23,16 @@ Discipline for any agent (human or otherwise) that touches this repo.
 
 - `brew bundle install` provisions macOS dependencies.
 - `stow $(cat .stow-packages)` deploys configurations. Idempotent.
+
+## Agent stack
+
+- Claude Code config: `claude/.claude/settings.json` (tracked,
+  designed). Permissions split into `allow` / `deny` / `ask` tiers;
+  personal overrides via untracked `~/.claude/settings.local.json`.
+- Claude Code slash commands: `claude/.claude/commands/*.md`. Each
+  command's `allowed-tools` frontmatter scopes its permissions
+  independently of the root settings; using the command IS the
+  authorization.
+- Per-directory scoped permissions: `<dir>/.claude/settings.local.json`
+  narrows the agent surface for work confined to that directory
+  (e.g., `scripts/.claude/settings.local.json` for the gh-API tools).

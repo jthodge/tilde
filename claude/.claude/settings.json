@@ -1,0 +1,70 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(pwd:*)",
+      "Bash(cd:*)",
+      "Bash(which:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(echo:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(brew list:*)",
+      "Bash(brew info:*)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Bash(rm -rf:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ],
+    "defaultMode": "auto"
+  },
+  "effortLevel": "high",
+  "skipAutoPermissionPrompt": true,
+  "skipDangerousModePermissionPrompt": true,
+  "alwaysThinkingEnabled": true,
+  "enabledPlugins": {
+    "honcho@honcho": true,
+    "honcho-dev@honcho": true
+  },
+  "extraKnownMarketplaces": {
+    "honcho": {
+      "source": {
+        "source": "github",
+        "repo": "plastic-labs/claude-honcho"
+      }
+    }
+  },
+  "spinnerVerbs": {
+    "mode": "replace",
+    "verbs": [
+      "Engineering",
+      "Computing",
+      "Processing",
+      "Executing",
+      "Analyzing",
+      "Synthesizing",
+      "Calculating",
+      "Generating",
+      "Formulating",
+      "Determining",
+      "Deriving",
+      "Implementing"
+    ]
+  }
+}
