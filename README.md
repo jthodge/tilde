@@ -15,6 +15,46 @@ Each entry in `.stow-packages` (`bash`, `bin`, `emacs`, `git`, `zsh`)
 mirrors a slice of `$HOME`. The `scripts/` directory is intentionally
 not stowed — its contents are invoked in place.
 
+## GitHub SSH key registration
+
+GitHub treats SSH keys in two independent categories on your account:
+**Authentication keys** (used for `git push` / `git fetch` over SSH) and
+**Signing keys** (used to verify commit signatures). A key registered
+under one does not count for the other.
+
+Register `~/.ssh/id_ed25519.pub` under **both** so that:
+
+- `git push` over SSH works (authentication).
+- Commits signed locally via `op-ssh-sign` render a green **Verified**
+  badge on github.com (signing).
+
+Same public key bytes; two separate entries.
+
+### Via the GitHub UI
+
+At https://github.com/settings/keys, for each category:
+
+1. Click **New SSH key**.
+2. **Title:** `id_ed25519 (authentication)` or `id_ed25519 (signing)`.
+3. **Key type:** select **Authentication Key** or **Signing Key** to match.
+4. **Key:** paste the contents of `~/.ssh/id_ed25519.pub`.
+5. Save. Repeat for the other category.
+
+### Via the `gh` CLI
+
+```sh
+gh auth refresh -h github.com -s admin:public_key,admin:ssh_signing_key
+gh ssh-key add ~/.ssh/id_ed25519.pub --type authentication --title "id_ed25519 (authentication)"
+gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "id_ed25519 (signing)"
+```
+
+### Why the separation exists
+
+The allowlists are independent so that a read-only deploy key (auth
+only, often on shared infrastructure) cannot be misused to forge
+"verified" commits in your account, and a hardware-token-bound signing
+key never doubles as an inbound auth vector.
+
 ## Hooks
 
 The `git` package ships a staged-secret pre-commit hook at
