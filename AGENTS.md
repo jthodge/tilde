@@ -90,3 +90,8 @@ visual state is identical across them.
   Any harness following the SKILL.md convention (Pi via its skills
   loader, Claude Code via plugins) can consume them. Skills are
   reusable across tool churn — they outlive any single harness.
+- Cross-agent coordination scratch: per-directory `.context/`
+  directories (gitignored repo-wide) hold ephemeral plans, notes,
+  and intermediate output shared between agent invocations. Not
+  for committed documentation — for short-lived runtime state
+  that humans rarely review but agents need to hand off.
