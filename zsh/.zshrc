@@ -36,7 +36,6 @@ eval "$(zoxide init zsh)"
 
 ### Compiler
 alias gcc=/opt/homebrew/bin/gcc-14
-# alias gcc=/usr/bin/gcc
 
 ## Haskell
 
@@ -93,7 +92,6 @@ fi
 
 ## Claude
 alias claude="/Users/jth/.claude/local/claude"
-
 
 export GOPATH="$HOME/go"; export GOROOT="$HOME/.go"; export PATH="$GOPATH/bin:$PATH"; # g-install: do NOT edit, see https://github.com/stefanmaric/g
 
