@@ -11,9 +11,10 @@ brew bundle install
 stow -d . -t "$HOME" $(cat .stow-packages)
 ```
 
-Each entry in `.stow-packages` (`bash`, `bin`, `emacs`, `git`, `zsh`)
-mirrors a slice of `$HOME`. The `scripts/` directory is intentionally
-not stowed — its contents are invoked in place.
+Each entry in `.stow-packages` mirrors a slice of `$HOME`; the
+file is the canonical list and the bootstrap above feeds it to
+`stow` verbatim. The `scripts/` directory is intentionally not
+stowed — its contents are invoked in place.
 
 ## GitHub SSH key registration
 
