@@ -23,5 +23,8 @@
 # tmux runtime plugin state (tpm installs into here; tpm itself is a tracked submodule)
 tmux/.tmux/plugins/*
 
+# fish per-machine universal variable state (regenerated on first launch)
+fish/.config/fish/fish_variables
+
 # Cross-agent coordination scratch (per-directory, ephemeral)
 .context/
