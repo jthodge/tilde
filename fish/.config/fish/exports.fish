@@ -1,5 +1,12 @@
 # Identity
 
+## SHELL
+## Alacritty execs fish directly (no /usr/bin/login wrapper), so $SHELL
+## leaks from launchd's session env. Self-correct here so downstream
+## tools (git's editor chooser, completion emitters keying off $SHELL,
+## tmux's default-shell inheritance) see the truth.
+set -gx SHELL (command -v fish)
+
 ## 1Password SSH agent
 set -gx SSH_AUTH_SOCK "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
