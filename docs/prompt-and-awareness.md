@@ -1,0 +1,127 @@
+# Prompt & Situational Awareness
+
+## Why this design
+
+Alacritty's renderer (`crossfont`) cannot draw Nerd Font glyphs, even from a
+glyph-complete font that CoreText maps correctly (verified: the font, the OS
+font lookup, and Alacritty's face loading all check out — only the rasterizer
+fails). Rather than keep fighting it, the prompt is **minimal and glyph-free**,
+modeled on a Mark-Tran-style prompt, and the situational awareness that a
+verbose prompt (Spaceship / Ghostty) used to *push* is now *pulled* on demand.
+
+- **Push (old):** every prompt redraw shows node/python/rustc/go/kubectl/aws/tf
+  versions + context, each behind a Nerd Font glyph.
+- **Pull (now):** the prompt shows only `pwd` + git; you query the rest with a
+  command when you actually need it.
+
+## (1) The prompt — what changed
+
+Source of truth: `fish/.config/fish/conf.d/tide.fish` (tracked; `set -g` runs on
+every shell start and overrides any `fish_variables` universals).
+
+- `tide_left_prompt_items` = `pwd git newline` (unchanged — already minimal).
+- `tide_right_prompt_items` = **empty** (was the full Spaceship-equivalent set).
+- `tide_pwd_icon`, `tide_pwd_icon_home`, `tide_pwd_icon_unwritable`,
+  `tide_git_icon` = **empty** (the only Nerd glyphs left in the minimal prompt).
+
+Result: `~/path/to/dir  branch *dirty` then `❯` on the next line. Zero glyphs.
+
+**Restore any right-prompt segment** by editing that one line in `tide.fish`:
+
+```fish
+set -g tide_right_prompt_items status cmd_duration context jobs direnv node python rustc go kubectl aws terraform time
+```
+
+Segment colors are retained in `tide.fish`, so re-enabling a segment needs no
+other change. To see the change in an already-running shell: `exec fish`.
+
+## (2) Pull-based awareness — tools you already have
+
+Every signal the old prompt showed has an existing command. None of these
+require new tooling.
+
+| Signal                | Command (already installed)                          |
+|-----------------------|------------------------------------------------------|
+| Node version          | `node -v`  ·  `volta list node`                      |
+| pnpm version          | `pnpm -v`                                             |
+| Python version        | `python -V`                                           |
+| Active venv           | `echo $VIRTUAL_ENV`  (name: `basename $VIRTUAL_ENV`)  |
+| Rust                  | `rustc --version`  ·  `rustup show`                   |
+| Go                    | `go version`                                          |
+| All mise-managed vers | `mise current`  (only tools mise manages)            |
+| Git branch + status   | `git status -sb`  (branch, ahead/behind, dirty)      |
+| k8s context           | `kubectl config current-context`  (local, fast)      |
+| k8s namespace         | `kubectl config view --minify -o 'jsonpath={..namespace}'` |
+| AWS profile           | `echo $AWS_PROFILE`                                   |
+| AWS identity          | `aws sts get-caller-identity`  (network call)         |
+| Terraform workspace   | `terraform workspace show`                            |
+| direnv state          | `direnv status`                                       |
+
+Note: `mise current` is the closest off-the-shelf aggregator, but it only
+reports mise-managed tools — node (Volta) and python (uv) won't appear, so it
+isn't a complete substitute for your stack. That gap is what `ctx` (below) fills.
+
+## (3) `ctx` — one-shot environment snapshot (optional glue)
+
+A tiny fish function that runs the per-tool commands above and prints a compact,
+**local-only (no network)** snapshot, showing only what's relevant to the
+current directory. It's the only bespoke piece — pure glue over existing tools.
+
+### Install
+
+Save as `fish/.config/fish/functions/ctx.fish` (autoloads on first `ctx` call):
+
+```fish
+function _ctx_row
+    printf '%s%-9s%s %s\n' (set_color brblack) $argv[1] (set_color normal) (string join ' ' $argv[2..-1])
+end
+
+function ctx --description "On-demand environment snapshot (local, no network)"
+    _ctx_row pwd $PWD
+    if git rev-parse --is-inside-work-tree 2>/dev/null >/dev/null
+        _ctx_row git (git status -sb 2>/dev/null | head -1 | string replace '## ' '')
+    end
+    command -q node; and _ctx_row node (node -v)
+    command -q pnpm; and _ctx_row pnpm (pnpm -v)
+    if set -q VIRTUAL_ENV
+        _ctx_row python (python -V 2>&1 | string replace 'Python ' '') "(venv:" (basename $VIRTUAL_ENV)")"
+    else if command -q python
+        _ctx_row python (python -V 2>&1 | string replace 'Python ' '')
+    end
+    command -q rustc; and _ctx_row rust (rustc --version | string split ' ')[2]
+    command -q go; and _ctx_row go (go version | string match -rg 'go([0-9.]+)')
+    command -q kubectl; and _ctx_row k8s (kubectl config current-context 2>/dev/null)
+    set -q AWS_PROFILE; and _ctx_row aws $AWS_PROFILE
+    command -q terraform; and test -d .terraform; and _ctx_row terraform (terraform workspace show 2>/dev/null)
+end
+```
+
+### Example output
+
+```
+pwd       /Users/jth/conductor/workspaces/client/minnetonka-v2
+git       fix/onboarding-redirect *3
+node      v22.14.0
+pnpm      9.15.0
+python    3.13.2 (venv: base)
+k8s       primitive-prod
+aws       campus-staging
+```
+
+### Tuning
+
+- **Add a signal:** add a `command -q <tool>; and _ctx_row <label> (<cmd>)` line.
+- **Drop a signal:** delete its line.
+- **Want network identity** (AWS account, not just profile name): add
+  `command -q aws; and _ctx_row aws-id (aws sts get-caller-identity --query Account --output text 2>/dev/null)`
+  — note this adds latency and is intentionally omitted from the fast default.
+
+### Optional: surface it in tmux
+
+Bind a key to pop `ctx` in a small split (add to `tmux/.tmux.conf`):
+
+```tmux
+bind-key i split-window -v -l 10 "fish -lc ctx; read"
+```
+
+Then `` `-i `` shows the snapshot without leaving your current pane.

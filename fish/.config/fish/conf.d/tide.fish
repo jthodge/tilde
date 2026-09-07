@@ -1,8 +1,10 @@
-# Tide prompt configuration — Classic preset adapted for Spaceship-equivalent feel.
-# Customizations vs. stock Classic:
-#   - context always displayed (matches Spaceship SPACESHIP_USER_SHOW=always + _HOST_SHOW=always)
-#   - time segment enabled on the right (matches SPACESHIP_TIME_SHOW=true)
-#   - cmd_duration threshold lowered from 3000ms to 1000ms
+# Tide prompt configuration — minimal, glyph-free.
+# Left prompt only: truncated pwd + git branch/status, then the prompt char on a new line.
+# The right prompt (versions, infra context, time) is intentionally empty: Alacritty's
+# renderer (crossfont) cannot draw Nerd Font glyphs, so situational awareness is pulled on
+# demand instead — see docs/prompt-and-awareness.md (the `ctx` snapshot + per-tool commands).
+# Segment colors below are retained so any right-prompt segment can be re-enabled simply by
+# adding it back to tide_right_prompt_items.
 
 # Color anchors
 set -g _tide_color_dark_blue 0087AF
@@ -13,7 +15,10 @@ set -g _tide_color_light_blue 00AFFF
 
 # Layout
 set -g tide_left_prompt_items pwd git newline
-set -g tide_right_prompt_items status cmd_duration context jobs direnv node python rustc go kubectl aws terraform time
+# Right prompt intentionally empty — awareness is pulled via `ctx`, not pushed to the prompt.
+# To restore the full Spaceship-equivalent set, replace the empty line below with:
+#   set -g tide_right_prompt_items status cmd_duration context jobs direnv node python rustc go kubectl aws terraform time
+set -g tide_right_prompt_items
 set -g tide_left_prompt_frame_enabled true
 set -g tide_right_prompt_frame_enabled true
 set -g tide_left_prompt_prefix ''
@@ -49,6 +54,10 @@ set -g tide_pwd_color_anchors $_tide_color_light_blue
 set -g tide_pwd_color_dirs $_tide_color_dark_blue
 set -g tide_pwd_color_truncated_dirs 8787AF
 set -g tide_pwd_markers .bzr .citc .git .hg .node-version .python-version .ruby-version .shorten_folder_marker .svn .terraform bun.lockb Cargo.toml composer.json CVS go.mod package.json build.zig
+# Glyph-free: drop the Nerd Font folder/home/lock icons (Alacritty can't render them).
+set -g tide_pwd_icon ''
+set -g tide_pwd_icon_home ''
+set -g tide_pwd_icon_unwritable ''
 
 # git
 set -g tide_git_bg_color 444444
@@ -64,6 +73,8 @@ set -g tide_git_color_untracked $_tide_color_light_blue
 set -g tide_git_color_upstream $_tide_color_green
 set -g tide_git_truncation_length 24
 set -g tide_git_truncation_strategy
+# Glyph-free: drop the Nerd Font branch icon; the branch name stands on its own.
+set -g tide_git_icon ''
 
 # status
 set -g tide_status_bg_color 444444
