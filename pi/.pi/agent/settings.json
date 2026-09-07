@@ -1,7 +1,7 @@
 {
-  "lastChangelogVersion": "0.74.2",
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-4-7",
+  "lastChangelogVersion": "0.85.1",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "high",
   "theme": "modern-dark",
   "enabledModels": [
@@ -28,7 +28,9 @@
     "skills/native-web-search"
   ],
   "packages": [
-    "npm:pi-prompt-template-model@0.6.8"
+    "npm:pi-prompt-template-model@0.6.8",
+    "npm:pi-mcp-adapter",
+    "npm:pi-web-access"
   ],
   "hideThinkingBlock": false,
   "quietStartup": true
