@@ -21,8 +21,18 @@ Discipline for any agent (human or otherwise) that touches this repo.
 
 ## Bootstrap
 
-- `brew bundle install` provisions macOS dependencies.
-- `stow $(cat .stow-packages)` deploys configurations. Idempotent.
+- Prefer the `Makefile`; run its targets from the repo root.
+  - `make` (default) / `make dry-run` — simulate the deployment.
+    It writes nothing, so it is safe at any time.
+  - `make switch` — deploy every package in `.stow-packages`.
+  - `make check` — compare the live `$HOME` against this checkout and
+    report `MISSING`, `DRIFT`, or `UNDECLARED`.
+  - `make brew` / `make brew-diff` — install the declared Homebrew
+    packages, or list installed packages that the Brewfile omits.
+  - `make help` — list every target.
+- Run `make check` after any change to `.stow-packages`, and whenever
+  an app might have replaced a link with a real file.
+- Edit files in this repo. Do not edit the deployed links in `$HOME`.
 
 ## Terminals
 

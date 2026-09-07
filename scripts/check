@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Verify that the deployed $HOME agrees with this checkout.
+#
+# For every file that the repo tracks in a stow package, resolve the
+# matching path under $HOME and compare it to the repo file:
+#
+#   OK       the target resolves to the repo file
+#   MISSING  the target does not exist; the package is not stowed
+#   DRIFT    the target exists but resolves elsewhere. An application
+#            replaced the link with a real file, so repo edits no
+#            longer reach the live configuration.
+#
+# The script also reports a directory that looks like a stow package
+# but that .stow-packages does not list.
+#
+# The script writes nothing. It exits 1 if it finds a problem.
+#
+# Usage:
+#   scripts/check              # every declared package
+#   scripts/check fish git     # only the named packages
+set -uo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO"
+
+# Directories that are deliberately not stow packages.
+NOT_PACKAGES=(docs scripts)
+
+declared() { grep -v '^#' .stow-packages | grep -v '^[[:space:]]*$'; }
+
+# macOS ships bash 3.2, which has no `mapfile`; read the list by hand.
+PACKAGES=()
+if [ "$#" -gt 0 ]; then
+  PACKAGES=("$@")
+else
+  while IFS= read -r line; do
+    PACKAGES+=("$line")
+  done < <(declared)
+fi
+
+problems=0
+checked=0
+
+for pkg in "${PACKAGES[@]}"; do
+  if [ ! -d "$pkg" ]; then
+    printf 'DRIFT    %-38s declared in .stow-packages, absent from the repo\n' "$pkg"
+    problems=$((problems + 1))
+    continue
+  fi
+
+  while IFS= read -r -d '' rel; do
+    target="$HOME/${rel#"$pkg"/}"
+    checked=$((checked + 1))
+
+    if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+      printf 'MISSING  %-38s %s\n' "$rel" "$target"
+      problems=$((problems + 1))
+      continue
+    fi
+
+    want="$(realpath "$REPO/$rel" 2>/dev/null)"
+    got="$(realpath "$target" 2>/dev/null)"
+
+    if [ "$want" != "$got" ]; then
+      printf 'DRIFT    %-38s %s\n' "$rel" "$target -> ${got:-unresolvable}"
+      problems=$((problems + 1))
+    fi
+  done < <(git ls-files -z -- "$pkg")
+done
+
+# A tracked top-level directory that no one declared is a package that
+# a fresh bootstrap would skip. This is how the fish package went
+# undeployed for months.
+if [ "$#" -eq 0 ]; then
+  while IFS= read -r dir; do
+    case " ${NOT_PACKAGES[*]} " in *" $dir "*) continue ;; esac
+    if ! declared | grep -qx "$dir"; then
+      printf 'UNDECLARED %-36s tracked directory, absent from .stow-packages\n' "$dir"
+      problems=$((problems + 1))
+    fi
+  done < <(git ls-files | awk -F/ 'NF > 1 {print $1}' | sort -u)
+fi
+
+echo
+if [ "$problems" -eq 0 ]; then
+  echo "OK: $checked tracked files resolve into $REPO"
+  exit 0
+fi
+echo "$problems problem(s) across $checked tracked files."
+echo "Fix with: make switch   (then re-run make check)"
+exit 1

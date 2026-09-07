@@ -7,14 +7,36 @@ Personal macOS dotfiles, deployed via [GNU Stow][stow].
 ```sh
 git clone git@github.com:jthodge/tilde.git ~/tilde
 cd ~/tilde
-brew bundle install
-stow -d . -t "$HOME" $(cat .stow-packages)
+make brew      # install the Homebrew packages the Brewfile declares
+make           # = make dry-run: simulate the deployment, write nothing
+make switch    # deploy every package
+make check     # verify the live $HOME against this checkout
 ```
 
+A `Makefile` wraps the workflow. Run `make help` for the full target
+list. `make` on its own is always safe: it simulates and writes
+nothing.
+
 Each entry in `.stow-packages` mirrors a slice of `$HOME`; the
-file is the canonical list and the bootstrap above feeds it to
+file is the canonical list and every `make` target feeds it to
 `stow` verbatim. The `scripts/` directory is intentionally not
 stowed — its contents are invoked in place.
+
+## Verifying a deployment
+
+`make check` (`scripts/check`) resolves every tracked file in every
+declared package to its path under `$HOME` and compares the two:
+
+- `MISSING` — the package is not stowed.
+- `DRIFT` — the target exists but resolves elsewhere. An application
+  replaced the link with a real file, so repo edits no longer reach
+  the live config.
+- `UNDECLARED` — a tracked directory that `.stow-packages` omits, so
+  a fresh bootstrap would skip it.
+
+`make brew-diff` is the package-inventory equivalent: it lists
+formulae and casks that are installed but that the `Brewfile` does
+not declare.
 
 ## GitHub SSH key registration
 
