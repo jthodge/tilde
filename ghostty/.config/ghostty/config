@@ -16,7 +16,21 @@ mouse-hide-while-typing = true
 shell-integration-features = no-cursor,ssh-env
 
 # Keybindings
-keybind = shift+enter=text:\n
+
+# Send Enter as a CSI-u (fixterms) sequence, so a TUI can tell the chord
+# apart from a plain Enter. The parameter is 1 + a modifier bitmask
+# (shift 1, alt 2), so ;2 is Shift+Enter and ;4 is Alt+Shift+Enter.
+#
+# Legacy encoding makes both chords ambiguous: Shift+Enter sends a bare
+# CR, identical to Enter, and Alt+Shift+Enter sends ESC CR, identical to
+# Alt+Enter. Neither reaches an application as a distinct key.
+#
+# The previous binding was `shift+enter=text:\n`. It sent a literal line
+# feed, which works for newline-versus-submit but carries no modifier
+# information and cannot express the Alt+Shift chord. Restore that line
+# if an application shows a literal `[13;2u` instead of acting on the key.
+keybind = shift+enter=csi:13;2u
+keybind = alt+shift+enter=csi:13;4u
 keybind = shift+insert=paste_from_clipboard
 keybind = control+insert=copy_to_clipboard
 keybind = super+control+shift+alt+arrow_down=resize_split:down,100
