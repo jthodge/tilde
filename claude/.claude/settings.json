@@ -21,8 +21,14 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git branch:*)",
+      "Bash(git fetch:*)",
       "Bash(brew list:*)",
-      "Bash(brew info:*)"
+      "Bash(brew info:*)",
+      "WebFetch(domain:workos.com)",
+      "WebFetch(domain:x.com)",
+      "WebFetch(domain:nitter.net)",
+      "WebFetch(domain:trevinsays.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [
       "Read(.env*)",
@@ -30,23 +36,32 @@
     ],
     "ask": [
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(git submodule:*)",
+      "Bash(rm:*)"
     ],
     "defaultMode": "auto"
   },
-  "effortLevel": "high",
-  "skipAutoPermissionPrompt": true,
-  "skipDangerousModePermissionPrompt": true,
-  "alwaysThinkingEnabled": true,
+  "model": "opus[1m]",
+  "hooks": {},
   "enabledPlugins": {
     "honcho@honcho": true,
-    "honcho-dev@honcho": true
+    "honcho-dev@honcho": true,
+    "jetty@jetty": true
   },
   "extraKnownMarketplaces": {
     "honcho": {
       "source": {
         "source": "github",
         "repo": "plastic-labs/claude-honcho"
+      }
+    },
+    "jetty": {
+      "source": {
+        "source": "github",
+        "repo": "jettyio/jettyio-skills"
       }
     }
   },
@@ -65,6 +80,27 @@
       "Determining",
       "Deriving",
       "Implementing"
+    ]
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "high"
+    }
+  },
+  "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": false,
+  "skipWorkflowUsageWarning": true,
+  "editorMode": "normal",
+  "verbose": true,
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "environment": [
+      "$defaults"
     ]
   }
 }

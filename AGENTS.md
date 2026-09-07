@@ -71,9 +71,16 @@ visual state is identical across them.
 
 ## Agent stack
 
-- Claude Code config: `claude/.claude/settings.json` (tracked,
-  designed). Permissions split into `allow` / `deny` / `ask` tiers;
-  personal overrides via untracked `~/.claude/settings.local.json`.
+- Claude Code config: `claude/.claude/settings.json`. Permissions
+  split into `allow` / `deny` / `ask` tiers; personal overrides via
+  untracked `~/.claude/settings.local.json`.
+  **App-owned.** Claude Code writes this file at runtime (model,
+  effort, plugins, permission grants). It is stowed as a symlink, so
+  those writes land in this repo and appear in `git status`. Review
+  and commit them; do not hand-edit the live file expecting the repo
+  to follow. If Claude Code ever replaces the symlink with a real
+  file, `make check` reports it as DRIFT — re-run `make switch` after
+  reconciling.
 - Claude Code slash commands: `claude/.claude/commands/*.md`. Each
   command's `allowed-tools` frontmatter scopes its permissions
   independently of the root settings; using the command IS the
