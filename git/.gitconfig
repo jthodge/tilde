@@ -16,13 +16,16 @@
 # [credential]
 #	helper = osxkeychain
 [core]
-	editor = /usr/bin/vim
+	editor = nvim
 	pager = delta
 	hooksPath = ~/.config/git/hooks
+	excludesfile = ~/.config/git/ignore
 [push]
 	default = upstream
+	autoSetupRemote = true
 [commit]
 	gpgsign = true
+	verbose = true
 [merge]
 	conflictstyle = diff3
 [filter "lfs"]
@@ -44,7 +47,18 @@
 [delta]
 	navigate = true    # use n and N to move between diff sections
 	light = false      # set to true if you're in a terminal w/ a light background color (e.g. the default macOS terminal)
-[merge]
-	conflictstyle = diff3
 [diff]
+	algorithm = histogram
 	colorMoved = default
+	mnemonicPrefix = true
+[fetch]
+	prune = true
+[rerere]
+	enabled = true
+	autoupdate = true
+[branch]
+	sort = -committerdate
+[tag]
+	sort = -version:refname
+[column]
+	ui = auto

@@ -1,0 +1,25 @@
+# Global ignore list. Git reads this path by default
+# ($XDG_CONFIG_HOME/git/ignore); core.excludesfile names it anyway, so
+# the file works even when XDG_CONFIG_HOME points elsewhere.
+
+# Editor and OS droppings
+.#*
+.dir-locals.el
+.DS_Store
+.vim/.netrwhist
+.vscode/
+
+# Tooling state
+.envrc
+.projectile
+projectile.cache
+.rbenv-version
+TAGS
+TAGS.*
+
+# Agent state. These hold machine-local overrides and scratch work.
+# Ignore them everywhere, so no work repo receives them by accident.
+**/.claude/settings.local.json
+**/.claude/worktrees/
+.pi/todos/
+.context/
