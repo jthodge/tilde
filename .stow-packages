@@ -4,6 +4,7 @@ bash
 bin
 claude
 emacs
+fish
 ghostty
 git
 nvim
