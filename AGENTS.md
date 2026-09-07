@@ -103,6 +103,14 @@ visual state is identical across them.
   toggle model + tool surface; extensions live in
   `pi/.pi/agent/extensions/`. Authenticated via OAuth subscriptions
   (`pi /login`), not API keys. See README for install path.
+- Harness-agnostic preferences: `agents/.agents/preferences.md` is the
+  single source for cross-harness policy — communication, attribution,
+  git workflow, secrets, verification. Stow fans it out to
+  `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and
+  `~/.pi/agent/AGENTS.md` through in-repo symlinks, so all three read
+  the same bytes and cannot drift. Edit the canonical file, never a
+  deployed link; restart agent sessions to reload. Harness-specific
+  rules do not belong in it.
 - Harness-agnostic skill library: `agents/.agents/skills/<name>/SKILL.md`.
   Any harness following the SKILL.md convention (Pi via its skills
   loader, Claude Code via plugins) can consume them. Skills are
