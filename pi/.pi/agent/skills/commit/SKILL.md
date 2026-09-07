@@ -18,8 +18,13 @@ Create a git commit for the current changes using a concise Conventional Commits
 - Body is OPTIONAL. If needed, add a blank line after the subject and write short paragraphs.
 - Do NOT include breaking-change markers or footers.
 - Do NOT add sign-offs (no `Signed-off-by`).
-- Only commit; do NOT push.
+- Split unrelated changes into separate logical commits. Do not bundle them.
 - If it is unclear whether a file should be included, ask the user which files to commit.
+- Sign every commit. If signing fails, stop and report it. Never disable signing.
+- Commit locally. Do NOT push. A request to commit, save, or "get it on main" is
+  not permission to publish.
+- Never push to `main`, `master`, or the repository's default branch, and never
+  merge a PR or force-push, without an explicit instruction to do so.
 - Treat any caller-provided arguments as additional commit guidance. Common patterns:
   - Freeform instructions should influence scope, summary, and body.
   - File paths or globs should limit which files to commit. If files are specified, only stage/commit those unless the user explicitly asks otherwise.
@@ -31,5 +36,8 @@ Create a git commit for the current changes using a concise Conventional Commits
 2. Review `git status` and `git diff` to understand the current changes (limit to argument-specified files if provided).
 3. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
 4. If there are ambiguous extra files, ask the user for clarification before committing.
-5. Stage only the intended files (all changes if no files specified).
+5. Stage only the files for the next logical commit (all related changes if no
+   files specified).
 6. Run `git commit -m "<subject>"` (and `-m "<body>"` if needed).
+7. Repeat steps 5 and 6 for each remaining unrelated logical change.
+8. Report the commits. Leave them local unless the user asked for a push.
