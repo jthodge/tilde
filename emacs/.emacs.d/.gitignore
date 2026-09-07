@@ -49,3 +49,18 @@ flycheck_*.el
 
 # ido
 ido.last
+
+# native-compilation cache (Emacs 28+)
+/eln-cache/
+
+# tree-sitter grammars, built by treesit-install-language-grammar (Emacs 29+)
+/tree-sitter/
+
+# lsp-mode session state
+/.lsp-session-v1
+
+# dap-mode breakpoint state
+/.dap-breakpoints
+
+# url library cache
+/url/
