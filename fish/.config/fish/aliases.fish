@@ -33,5 +33,6 @@ alias pip="uv pip"
 
 # Agents
 
-## Claude
-alias claude=/Users/jth/.claude/local/claude
+## Claude — defined as a function (functions/claude.fish) so it can
+## lazy-load HONCHO_API_KEY from 1Password before launch, matching the
+## honcho() lazy-credential pattern.
