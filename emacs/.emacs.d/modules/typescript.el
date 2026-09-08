@@ -104,7 +104,9 @@ An existing built-in tree-sitter mapping is not usable without its grammar."
                      (treesit-language-available-p grammar)
                      (fboundp ts-mode))))
     (when (or (null entry)
-              (and (not ready) (memq (cdr entry) '(typescript-ts-mode tsx-ts-mode))))
+              (and (not ready)
+                   (memq (cdr entry) '(typescript-ts-mode tsx-ts-mode
+                                       typescript-ts-mode-maybe tsx-ts-mode-maybe))))
       (setf (alist-get pattern auto-mode-alist nil nil #'equal)
             (cond (ready ts-mode)
                   ((fboundp 'typescript-mode) 'typescript-mode)

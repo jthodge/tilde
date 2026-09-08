@@ -375,8 +375,9 @@
   (tilde-test--install-stubs)
   (unwind-protect
       (cl-letf (((symbol-function 'treesit-available-p) (lambda () nil)))
-        (let ((auto-mode-alist '(("\\.ts\\'" . typescript-ts-mode)
-                                 ("\\.tsx\\'" . tsx-ts-mode))))
+        ;; Emacs 31 adds wrappers that fall back to fundamental-mode.
+        (let ((auto-mode-alist '(("\\.ts\\'" . typescript-ts-mode-maybe)
+                                 ("\\.tsx\\'" . tsx-ts-mode-maybe))))
           (tilde-test--load-module "typescript")
           (dolist (name '("sample.ts" "sample.tsx"))
             (with-temp-buffer
