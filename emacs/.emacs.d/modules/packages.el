@@ -24,6 +24,8 @@
     consult-lsp            ; Improve working between `consult` and `lsp-mode`
     corfu                  ; Modern completion frontend
     dap-mode               ; Debug Adapter Protocol Support
+    embark                 ; Contextual actions (C-. / C-;)
+    embark-consult         ; Consult integration for Embark
     exec-path-from-shell   ; Import PATH/CPATH/LIBRARY_PATH in GUI Emacs
     flycheck               ; Linting and syntax checker
     flycheck-package       ; Elisp package linting for MELPA standards
@@ -31,6 +33,7 @@
     lsp-mode               ; Language Server Protocol support
     lsp-pyright            ; Language Server Protocol client using pyright Python Language Server
     lsp-ui                 ; UI improvements for `lsp-mode`
+    magit                  ; Git porcelain (autoloaded via C-c g)
     marginalia             ; Rich completion annotations
     orderless              ; Flexible completion matching
     vertico                ; Modern vertical completion

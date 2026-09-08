@@ -17,6 +17,8 @@ directory, so adding a file does not silently change startup behavior.
 - `bindings`: global command bindings.
 - `environments`: Python venv helpers (used by `python.el` on entry).
 - `typescript`, `python`, `go`, `elisp`: language-specific setup.
+- `workflow`: focused pilot for project, git, search, and test bindings
+  (see "Workflow pilot" below).
 - `custom-settings`: durable Customize declarations (tracked).
 
 `init.el` sets `custom-file` to `~/.emacs.d/custom.el` early, then
@@ -123,6 +125,103 @@ Switching A -> B in a buffer first rolls back to the pre-A snapshot,
 so `exec-path` never accumulates entries across successive
 activations. Deactivation restores the original snapshot verbatim.
 
+## Workflow pilot
+
+`modules/workflow.el` provides an **initial workflow** for day-to-day project
+navigation, git, search, and test running. It follows conventional key
+discipline (no Evil, prefixes stay under `C-c`) and does nothing on
+file open. Everything runs from explicit commands.
+
+### Keys
+
+| Prefix | Purpose | Notes |
+| --- | --- | --- |
+| `C-c p` | Built-in `project-prefix-map` (project.el) | Nothing added on top |
+| `C-c g` | Sparse Magit map: `s` status, `l` log, `b` blame | Autoload targets only |
+| `C-c s` | Consult search: `l/L` line(s), `r` ripgrep, `g` grep, `f` find, `i` imenu, `o` outline | |
+| `C-c t` | Project tests: `p` project, `f` file, `n` nearest, `r` rerun | See below |
+| `C-.` | `embark-act` | Bound only if the global slot is unbound |
+| `C-;` | `embark-dwim` | Bound only if the global slot is unbound |
+
+`which-key` turns on when installed so the prefix maps are
+discoverable.
+
+### Magit scope
+
+The `C-c g` map exposes three autoloaded entry points. It does **not**
+disable or weaken any Magit safety:
+
+- Commit signing (`magit-commit-arguments`, GPG/SSH agent) is left as
+  Magit configures it.
+- Push confirmation prompts and "dangerous action" warnings are not
+  suppressed.
+- Git continues to require SSH signing through the 1Password agent.
+
+Treat the map as a shortcut, not a policy override.
+
+### Project tests
+
+`C-c t` runs test commands via `compile` (compilation-mode) with
+`default-directory` pinned to the project root. The last command is
+remembered **per project root**, not globally, so `C-c t r` in repo A
+does not run repo B's last command.
+
+Detection is by marker file in the project root:
+
+| Kind | Marker | Project | File | Nearest |
+| --- | --- | --- | --- | --- |
+| Python | `pyproject.toml`/`uv.lock`/`setup.py`/`requirements.txt` | `uv run pytest` | `uv run pytest <file>` | `uv run pytest <file>::<class>::<test>` |
+| Go | `go.mod` | `go test ./...` | `go test ./<pkgdir>` | `go test -run '^TestX$' ./<pkgdir>` |
+| JS | `package.json` + lockfile | `<runner> test` | `<runner> test -- <file>` | user-error (see below) |
+
+JS runner is picked from the lockfile only: `pnpm-lock.yaml` -> `pnpm`,
+`yarn.lock` -> `yarn`, `package-lock.json` -> `npm`. Missing lockfile
+is a `user-error`; the runner is never guessed from `package.json`.
+
+`C-c t n` for JS deliberately signals `user-error` rather than picking
+a jest/vitest/mocha runner by heuristic. Use file tests or set an explicit
+project command and invoke `C-c t p`. The override affects project tests only.
+JS file tests require the project's test script to accept a file argument.
+
+Filenames are passed through `shell-quote-argument`, so a file named
+`weird name; rm -rf.py` is safe.
+
+Go file-scope runs the **enclosing package**, not an isolated-file
+compile. This matches how `go test` is meant to be invoked.
+
+Python nearest uses `python-info-current-defun` and preserves class names
+in an exact pytest node ID. It refuses a non-test function. Go nearest
+checks the nearest preceding function declaration; it refuses helpers
+instead of accidentally selecting an earlier test, and uses `^TestX$`.
+
+### Overriding the command
+
+Set `my/workflow-project-test-command` as a buffer-local variable to
+override the auto-detected project command:
+
+```elisp
+(setq-local my/workflow-project-test-command "make test-fast")
+```
+
+This variable is deliberately **not** marked with `safe-local-variable`.
+A `.dir-locals.el` or file-local value will prompt on first read. A
+free-form shell string from an untrusted checkout should stay unsafe by
+default; do not add a blanket safe predicate.
+
+### Optional pilot install
+
+The declared package set now includes `magit`, `embark`, and
+`embark-consult`. To install them explicitly:
+
+```
+M-x my/install-packages
+```
+
+The rest of Emacs can start without them. Install the declared packages
+before using Magit; Embark keys are only installed when its package exists.
+Restart Emacs after installation. Remove the workflow module from the loader
+to remove its keybindings; uninstalling packages alone leaves bound symbols.
+
 ## Tests and limits
 
 Static Python tests (already existed):
@@ -136,7 +235,18 @@ New ERT tests (batch, hermetic):
 ```sh
 emacs -Q --batch -l scripts/tests/emacs-config.el \
       -f ert-run-tests-batch-and-exit
+emacs -Q --batch -l scripts/tests/emacs-workflow.el \
+      -f ert-run-tests-batch-and-exit
 ```
+
+The workflow suite stubs `compile` and uses temp project roots. It
+never runs a real test suite, never mutates a real git repo, and never
+starts a subprocess. It covers key wiring, per-language project/file
+commands, JS lockfile selection, shell quoting of scary filenames, Go
+package-dir (not file) semantics, per-project rerun isolation, missing
+project / unsupported project / missing JS lockfile / JS nearest
+`user-error` paths, buffer-local override precedence and its lack of
+auto-safe marker, and Python/Go nearest anchor logic.
 
 The ERT tests **never** load the user's full `init.el`. They load
 individual modules under stubs for `lsp-mode` and friends and never

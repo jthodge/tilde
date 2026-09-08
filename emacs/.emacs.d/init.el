@@ -33,6 +33,7 @@
                   "python"
                   "go"
                   "elisp"
+                  "workflow"
                   "custom-settings"))
   (load (expand-file-name (concat "modules/" module ".el") user-emacs-directory)
         nil nil t))
