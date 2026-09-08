@@ -75,12 +75,13 @@ stowed — its contents are invoked in place.
 Two diagnostics answer two different questions:
 
 - `make check` (`scripts/check`) — **does the deployed `$HOME`
-  match this checkout?** Resolves every tracked file in every
-  declared package to its path under `$HOME` and compares the two:
+  match its ownership rules?** Checks repository-owned links and
+  seed-only app-owned files. See [configuration ownership](docs/config-ownership.md).
+  It reports:
   - `MISSING` — the package is not stowed.
   - `DRIFT` — the target exists but resolves elsewhere. An
-    application replaced the link with a real file, so repo edits
-    no longer reach the live config.
+    application replaced a repository-owned link with a real file,
+    or a seed-only file has the wrong ownership.
   - `UNDECLARED` — a tracked directory that `.stow-packages`
     omits, so a fresh bootstrap would skip it.
 - `make doctor` (`scripts/doctor`) — **does the surrounding

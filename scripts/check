@@ -49,8 +49,18 @@ for pkg in "${PACKAGES[@]}"; do
   fi
 
   while IFS= read -r -d '' rel; do
+    # Stow control files are not deployed. Claude settings are seed-only:
+    # scripts/seed-configs preserves app-owned regular files byte-for-byte.
+    case "$rel" in */.stow-local-ignore) continue ;; esac
     target="$HOME/${rel#"$pkg"/}"
     checked=$((checked + 1))
+    if [ "$rel" = "claude/.claude/settings.json" ]; then
+      if [ ! -f "$target" ] || [ -L "$target" ]; then
+        printf 'DRIFT    %-38s expected an app-owned file; run make switch\n' "$rel"
+        problems=$((problems + 1))
+      fi
+      continue
+    fi
 
     if [ ! -e "$target" ] && [ ! -L "$target" ]; then
       printf 'MISSING  %-38s %s\n' "$rel" "$target"
@@ -83,7 +93,7 @@ fi
 
 echo
 if [ "$problems" -eq 0 ]; then
-  echo "OK: $checked tracked files resolve into $REPO"
+  echo "OK: $checked tracked deployment entries match their ownership rules"
   exit 0
 fi
 echo "$problems problem(s) across $checked tracked files."

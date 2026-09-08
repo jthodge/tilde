@@ -84,13 +84,13 @@ visual state is identical across them.
 - Claude Code config: `claude/.claude/settings.json`. Permissions
   split into `allow` / `deny` / `ask` tiers; personal overrides via
   untracked `~/.claude/settings.local.json`.
-  **App-owned.** Claude Code writes this file at runtime (model,
-  effort, plugins, permission grants). It is stowed as a symlink, so
-  those writes land in this repo and appear in `git status`. Review
-  and commit them; do not hand-edit the live file expecting the repo
-  to follow. If Claude Code ever replaces the symlink with a real
-  file, `make check` reports it as DRIFT — re-run `make switch` after
-  reconciling.
+  **Seed-only.** Claude Code owns the regular local settings file.
+  Stow excludes the tracked template; `make switch` seeds it only if
+  absent. Existing regular files are preserved byte-for-byte. Legacy
+  links are backed up and detached without changing their contents.
+  Template changes apply to new machines only. Migrate existing local
+  preferences explicitly, never overwrite them with the template.
+  See `docs/config-ownership.md` for the complete ownership model.
 - Claude Code slash commands: `claude/.claude/commands/*.md`. Each
   command's `allowed-tools` frontmatter scopes its permissions
   independently of the root settings; using the command IS the

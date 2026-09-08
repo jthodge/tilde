@@ -29,9 +29,11 @@ help: ## Show this help
 
 dry-run: ## Simulate the deployment, write nothing (default)
 	stow --simulate --verbose --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
+	@python3 scripts/seed-configs
 
 switch: ## Deploy every package; repeat as often as you like
 	stow --restow --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
+	@python3 scripts/seed-configs --apply
 
 unstow: ## Remove every link that stow deployed
 	stow --delete --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)

@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Seed app-owned files; preserve local preferences and detach legacy links."""
+import argparse
+import json
+import os
+from pathlib import Path
+import tempfile
+import time
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def seed(source, target, state, apply=False):
+    """Return an action. An existing regular file is never written or parsed."""
+    target = Path(target)
+    if target.is_symlink():
+        if not target.is_file():
+            raise ValueError("broken or non-file config link: " + str(target))
+        before = target.lstat()
+        data = target.read_bytes()
+        action = "detach"
+    elif target.exists():
+        if not target.is_file():
+            raise ValueError("config target is not a regular file: " + str(target))
+        return "preserve"
+    else:
+        before = None
+        data = Path(source).read_bytes()
+        action = "seed"
+    json.loads(data)  # Do not install or detach a malformed config.
+    if not apply:
+        return action
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if before is not None:
+        backup = Path(state) / "backups" / str(time.time_ns())
+        backup.mkdir(parents=True, mode=0o700)
+        backup_file = backup / target.name
+        fd = os.open(str(backup_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+    fd, temporary = tempfile.mkstemp(prefix=".tilde-seed-", dir=str(target.parent))
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+        if before is None:
+            # Exclusive publication: a config created concurrently wins.
+            os.link(temporary, target)
+        else:
+            current = target.lstat()
+            if (current.st_ino, current.st_mtime_ns) != (before.st_ino, before.st_mtime_ns):
+                raise ValueError("config link changed during migration")
+            os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return action
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="seed or detach; default is a dry run")
+    args = parser.parse_args()
+    home = Path.home()
+    try:
+        action = seed(REPO / "claude/.claude/settings.json", home / ".claude/settings.json",
+                      home / ".local/state/tilde", args.apply)
+    except (OSError, ValueError) as error:
+        parser.exit(1, "seed-configs: " + str(error) + "\n")
+    print(json.dumps({"target": ".claude/settings.json", "action": action, "applied": args.apply}))
+
+
+if __name__ == "__main__":
+    main()

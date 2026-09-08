@@ -25,6 +25,7 @@ tmux/.tmux/plugins/*
 
 # fish per-machine universal variable state (regenerated on first launch)
 fish/.config/fish/fish_variables
+fish/.config/fish/local.fish
 
 # Cross-agent coordination scratch (per-directory, ephemeral)
 .context/
