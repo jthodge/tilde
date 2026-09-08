@@ -60,7 +60,7 @@ def lint():
 
 def typecheck():
     require("pyright")
-    run("pyright", "--pythonversion", "3.9", "--level", "error",
+    run("pyright", "--pythonpath", sys.executable, "--pythonversion", "3.9", "--level", "error",
         "scripts/doctor", "scripts/seed-configs", "scripts/verify", "scripts/tests")
 
 

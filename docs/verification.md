@@ -13,7 +13,10 @@ make doctor      # read-only host/tool inventory
 `make lint`, `make typecheck`, and `make test` also work separately. Each
 verification command emits JSON on stdout, narration and child-tool output
 on stderr, exits nonzero on failure, and stops at the first failed phase.
-The Makefile records the Pyright version used locally and in CI.
+The Makefile records the Pyright version used locally and in CI. Pyright uses
+the test interpreter's library paths while checking Python 3.9 compatibility.
+CI explicitly selects Python 3.13, rather than inheriting Homebrew's newest
+Python and its possibly unsupported syntax.
 
 ## Coverage and boundaries
 

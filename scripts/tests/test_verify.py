@@ -21,6 +21,13 @@ class VerificationTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Missing verification tools: fish"):
                 module.require("fish")
 
+    def test_typechecker_uses_the_test_interpreter(self):
+        with patch.object(module, "require"), patch.object(module, "run") as run:
+            module.typecheck()
+        args = run.call_args.args
+        self.assertEqual(args[args.index("--pythonpath") + 1], module.sys.executable)
+        self.assertEqual(args[args.index("--pythonversion") + 1], "3.9")
+
     def invoke(self, choice):
         out, err = io.StringIO(), io.StringIO()
         with patch.object(module.sys, "argv", ["verify", choice]), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
