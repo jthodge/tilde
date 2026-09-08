@@ -19,7 +19,7 @@ PACKAGES    := $(shell grep -v '^$(HASH)' .stow-packages | grep -v '^[[:space:]]
 
 PYRIGHT_VERSION := 1.1.403
 
-.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools
+.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools capabilities
 
 help: ## Show this help
 	@echo "Packages: $(PACKAGES)"
@@ -77,6 +77,9 @@ test-tools: ## Install the declared verification dependencies explicitly
 
 doctor: ## Read-only environment probe (JSON on stdout, summary on stderr)
 	@scripts/doctor
+
+capabilities: ## Probe declared dev capabilities on temp workspaces (no installs)
+	@python3 scripts/check-capabilities
 
 tools: ## Bootstrap runtime toolchain from scripts/runtime-versions.env
 	@scripts/setup-tools --install

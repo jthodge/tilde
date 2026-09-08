@@ -1,0 +1,932 @@
+#!/usr/bin/env python3
+"""Probe declared local development capabilities.
+
+Runs a small, fixed set of *functional* probes against installed
+Python, Node, and Go toolchains. Every probe executes inside a
+throw-away temp workspace with a temporary HOME/XDG/cache, a scrubbed
+environment, and a bounded subprocess timeout. Nothing is installed,
+downloaded, or fetched over the network; no real project directory or
+credential file is written or modified.
+
+Emits a JSON report on STDOUT and a short human summary on STDERR.
+Exits nonzero if any *required* capability is missing or fails. Optional
+capabilities (currently ``goimports``) never flip the exit code but are
+still reported.
+
+What the probes prove:
+  * The tool starts, honours the flag surface we depend on, and produces
+    the output we expect on a tiny synthetic input.
+  * Required runtimes (`python`, `node`, `go`) print a version string
+    via their standard flag; the string is captured verbatim.
+  * For language servers, the process accepts an LSP ``initialize``
+    request over stdio and returns a JSON-RPC 2.0 response whose
+    ``result.capabilities`` is a JSON object.
+
+What the probes do NOT prove:
+  * That the server actually loads a real project (workspace folders are
+    empty synthetic dirs, no dependencies, no plugins configured).
+  * That completion, hover, diagnostics, or code actions work.
+  * That editors are configured to speak to any of these servers.
+  * That any of the tools work under the developer's real HOME/PATH
+    settings — probes deliberately scrub the environment.
+
+Isolation is *not* a network sandbox. Offline flags (``GOPROXY=off``,
+``PIP_NO_INDEX=1``, ``disableAutomaticTypingAcquisition``) and synthetic
+fixtures minimise incidental network use; they do not enforce
+containment.
+
+Run with ``--help`` for options. See ``docs/development-capabilities.md``.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import selectors
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Bounds
+# ---------------------------------------------------------------------------
+
+# Fixed timeout budgets. Every probe should be well under a couple of
+# seconds; the ceiling exists to guarantee the script terminates even
+# if a child hangs. Cleanup (SIGTERM + SIGKILL of the process group and
+# drainer-thread joins) runs inside a small additional grace budget on
+# top of the timeout.
+DEFAULT_TIMEOUT = 20.0
+LSP_TIMEOUT = 15.0
+KILL_GRACE = 2.0  # per signal step
+JOIN_GRACE = 2.0
+
+# Bounded per-stream capture. Drainers keep reading past the limit so
+# the child never blocks on pipe backpressure; excess bytes are counted
+# but discarded from the returned buffer.
+LSP_STDOUT_LIMIT = 2_000_000
+LSP_STDERR_LIMIT = 128 * 1024
+CMD_STDOUT_LIMIT = 256 * 1024
+CMD_STDERR_LIMIT = 256 * 1024
+
+# LSP framing sanity: refuse absurd or non-positive Content-Length
+# headers rather than allocating on them.
+LSP_MAX_CONTENT_LENGTH = LSP_STDOUT_LIMIT
+
+# ---------------------------------------------------------------------------
+# Environment scrubbing
+# ---------------------------------------------------------------------------
+
+
+def _real_volta_home() -> str | None:
+    """Return the developer's Volta state dir, if the current env has one."""
+    explicit = os.environ.get("VOLTA_HOME")
+    if explicit and os.path.isdir(explicit):
+        return explicit
+    real_home = os.environ.get("HOME")
+    if real_home:
+        candidate = os.path.join(real_home, ".volta")
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def clean_env(temp_home: str, extra: dict[str, str] | None = None,
+              extra_path: list[str] | None = None) -> dict[str, str]:
+    """Return a minimal env with PATH, LANG, and temp HOME/XDG/TMPDIR.
+
+    PATH and (when set) VOLTA_HOME are forwarded from the caller because
+    binaries would not resolve without them. Volta shims may read their
+    own installation metadata under VOLTA_HOME and write log files there;
+    that path is not enforced read-only. Every other environment variable
+    (``PYTHONPATH``, ``NODE_OPTIONS``, ``GO*``, ``NPM_*``, credentials, …)
+    is dropped.
+    """
+    path = os.environ.get("PATH", "/usr/bin:/bin")
+    if extra_path:
+        path = os.pathsep.join([*extra_path, path])
+    env = {
+        "PATH": path,
+        "LANG": os.environ.get("LANG", "C"),
+        "LC_ALL": "C",
+        "TERM": "dumb",
+        "NO_COLOR": "1",
+        "HOME": temp_home,
+        "XDG_CONFIG_HOME": os.path.join(temp_home, ".config"),
+        "XDG_CACHE_HOME": os.path.join(temp_home, ".cache"),
+        "XDG_DATA_HOME": os.path.join(temp_home, ".local", "share"),
+        "XDG_STATE_HOME": os.path.join(temp_home, ".local", "state"),
+        "TMPDIR": temp_home,
+    }
+    volta_home = _real_volta_home()
+    if volta_home is not None:
+        env["VOLTA_HOME"] = volta_home
+    if extra:
+        env.update(extra)
+    return env
+
+
+# ---------------------------------------------------------------------------
+# Bounded process I/O
+# ---------------------------------------------------------------------------
+
+
+class _BoundedBuffer:
+    """Fixed-cap byte accumulator that still tracks the total seen."""
+
+    __slots__ = ("_buf", "_limit", "total")
+
+    def __init__(self, limit: int) -> None:
+        self._buf = bytearray()
+        self._limit = limit
+        self.total = 0
+
+    def append(self, chunk: bytes) -> None:
+        self.total += len(chunk)
+        remaining = self._limit - len(self._buf)
+        if remaining > 0:
+            self._buf.extend(chunk[:remaining])
+
+    def raw(self) -> bytes:
+        return bytes(self._buf)
+
+    def decode(self) -> str:
+        text = self._buf.decode("utf-8", "replace")
+        if self.total > self._limit:
+            elided = self.total - self._limit
+            text = f"{text}\n[... {elided} bytes elided ...]"
+        return text
+
+
+def _drain(fh, buf: _BoundedBuffer, stop: threading.Event) -> None:
+    """Read until EOF or ``stop`` is set. Keeps consuming past the cap."""
+    try:
+        with selectors.DefaultSelector() as ready:
+            ready.register(fh, selectors.EVENT_READ)
+            while not stop.is_set():
+                if not ready.select(timeout=0.1):
+                    continue
+                chunk = os.read(fh.fileno(), 4096)
+                if not chunk:
+                    return
+                buf.append(chunk)
+    except (OSError, ValueError):
+        return
+
+
+def _spawn(cmd: list[str], *, env: dict[str, str], cwd: str,
+           stdin_needed: bool, out_limit: int, err_limit: int):
+    """Spawn a child in its own POSIX session with bounded drainer threads.
+
+    Returns ``(proc, stdout_buf, stderr_buf, stop, threads)``.
+    """
+    # start_new_session=True puts the child in its own process group so
+    # we can signal the whole tree (tsserver, Volta shim, etc.) rather
+    # than just the top-level process. It is a no-op-equivalent flag on
+    # non-POSIX platforms but we keep it POSIX-only for portability of
+    # the surrounding os.killpg call.
+    proc = subprocess.Popen(
+        cmd, cwd=cwd, env=env,
+        stdin=subprocess.PIPE if stdin_needed else subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        start_new_session=(os.name == "posix"),
+    )
+    stdout_buf = _BoundedBuffer(out_limit)
+    stderr_buf = _BoundedBuffer(err_limit)
+    stop = threading.Event()
+    threads = []
+    for fh, buf in ((proc.stdout, stdout_buf), (proc.stderr, stderr_buf)):
+        t = threading.Thread(target=_drain, args=(fh, buf, stop), daemon=True)
+        t.start()
+        threads.append(t)
+    return proc, stdout_buf, stderr_buf, stop, threads
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the process group, escalating SIGTERM → SIGKILL.
+
+    Uses ``os.killpg`` so descendants (e.g. tsserver spawned by
+    typescript-language-server, or Volta's exec-plus-child topology)
+    are also signalled after the parent exits. A process that creates
+    its own session is outside this group; this is not containment.
+    """
+    if os.name == "posix":
+        # start_new_session made PID the group ID. getpgid(PID) fails once
+        # the parent exits, even when descendants still hold its pipes.
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                break
+            except PermissionError:
+                # Some hosts deny signals to a departed group. Never retry
+                # against another identity; a live parent remains an error.
+                if proc.poll() is None:
+                    raise
+                break
+            try:
+                proc.wait(timeout=KILL_GRACE)
+            except subprocess.TimeoutExpired:
+                pass
+            # A reaped parent does not prove its descendants exited.
+        try:
+            proc.wait(timeout=KILL_GRACE)
+        except subprocess.TimeoutExpired:
+            pass
+        return
+    # Fallback: signal only the parent.
+    try:
+        proc.terminate()
+        proc.wait(timeout=KILL_GRACE)
+        return
+    except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
+        pass
+    try:
+        proc.kill()
+        proc.wait(timeout=KILL_GRACE)
+    except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
+        pass
+
+
+def _cleanup(proc: subprocess.Popen, stop: threading.Event,
+             threads: list[threading.Thread]) -> None:
+    """Kill the tree, join drainers, then close streams.
+
+    Order matters: kill first so pipes close and drainers reach EOF, then
+    join threads before we close the file objects out from under them.
+    """
+    _kill_tree(proc)
+    for t in threads:
+        t.join(timeout=JOIN_GRACE)
+    stop.set()
+    for t in threads:
+        t.join(timeout=0.5)
+    for fh in (proc.stdin, proc.stdout, proc.stderr):
+        if fh is not None:
+            try:
+                fh.close()
+            except (OSError, ValueError):
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Command runner
+# ---------------------------------------------------------------------------
+
+
+def run_probe(cmd: list[str], *, env: dict[str, str], cwd: str,
+              stdin: bytes | None = None, timeout: float = DEFAULT_TIMEOUT,
+              ) -> dict:
+    """Run a subprocess with bounded output and a hard timeout.
+
+    Output is drained *during* execution, so memory is bounded even if
+    the child floods stdout or stderr. On timeout the entire process
+    group is signalled (SIGTERM → SIGKILL) so descendants are not
+    orphaned.
+    """
+    try:
+        proc, out_buf, err_buf, stop, threads = _spawn(
+            cmd, env=env, cwd=cwd, stdin_needed=stdin is not None,
+            out_limit=CMD_STDOUT_LIMIT, err_limit=CMD_STDERR_LIMIT,
+        )
+    except (OSError, FileNotFoundError) as exc:
+        return {"ok": False, "returncode": None, "stdout": "", "stderr": "",
+                "timed_out": False, "error": f"spawn failed: {exc}"}
+
+    timed_out = False
+    try:
+        if stdin is not None and proc.stdin is not None:
+            try:
+                proc.stdin.write(stdin)
+            except (BrokenPipeError, OSError):
+                pass
+            try:
+                proc.stdin.close()
+            except (OSError, ValueError):
+                pass
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+    finally:
+        _cleanup(proc, stop, threads)
+
+    return {
+        "ok": (not timed_out) and proc.returncode == 0,
+        "returncode": proc.returncode,
+        "stdout": out_buf.decode(),
+        "stderr": err_buf.decode(),
+        "timed_out": timed_out,
+        "error": "timed out" if timed_out else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Language-server handshake
+# ---------------------------------------------------------------------------
+
+
+def _parse_lsp_messages(stdout: bytes, offset: int, state: dict) -> tuple[int, dict | None, str | None]:
+    """Extract framed JSON-RPC messages from ``stdout[offset:]``.
+
+    ``state`` carries the in-progress Content-Length across calls.
+    Returns ``(new_offset, initialize_response_or_None, error_or_None)``.
+    """
+    content_length: int | None = state.get("cl")
+    while True:
+        if content_length is None:
+            idx = stdout.find(b"\r\n\r\n", offset)
+            if idx < 0:
+                state["cl"] = None
+                return offset, None, None
+            header_text = stdout[offset:idx].decode("ascii", "replace")
+            offset = idx + 4
+            length_val: int | None = None
+            for line in header_text.split("\r\n"):
+                if line.lower().startswith("content-length:"):
+                    try:
+                        length_val = int(line.split(":", 1)[1].strip())
+                    except ValueError:
+                        return offset, None, f"malformed Content-Length: {line!r}"
+            if length_val is None:
+                return offset, None, "missing Content-Length header"
+            if length_val <= 0:
+                return offset, None, f"non-positive Content-Length: {length_val}"
+            if length_val > LSP_MAX_CONTENT_LENGTH:
+                return offset, None, f"Content-Length {length_val} exceeds cap {LSP_MAX_CONTENT_LENGTH}"
+            content_length = length_val
+        if len(stdout) - offset < content_length:
+            state["cl"] = content_length
+            return offset, None, None
+        payload = stdout[offset:offset + content_length]
+        offset += content_length
+        length = content_length
+        content_length = None
+        try:
+            msg = json.loads(payload)
+        except json.JSONDecodeError as exc:
+            return offset, None, f"invalid JSON response ({length} bytes): {exc}"
+        if not isinstance(msg, dict):
+            continue  # framed non-object: skip
+        # Only the initialize response matters; skip notifications/log lines.
+        if type(msg.get("id")) is not int or msg.get("id") != 1:
+            continue
+        if msg.get("jsonrpc") != "2.0":
+            return offset, None, f"initialize response has wrong jsonrpc: {msg.get('jsonrpc')!r}"
+        state["cl"] = None
+        return offset, msg, None
+
+
+def lsp_initialize(cmd: list[str], *, env: dict[str, str], cwd: str,
+                   root_uri: str, init_options: dict | None = None,
+                   timeout: float = LSP_TIMEOUT) -> dict:
+    """Send one ``initialize`` request over stdio and validate the reply."""
+    try:
+        proc, out_buf, err_buf, stop, threads = _spawn(
+            cmd, env=env, cwd=cwd, stdin_needed=True,
+            out_limit=LSP_STDOUT_LIMIT, err_limit=LSP_STDERR_LIMIT,
+        )
+    except (OSError, FileNotFoundError) as exc:
+        return {"ok": False, "error": f"spawn failed: {exc}",
+                "capability_keys": [], "capability_count": 0, "stderr_tail": ""}
+
+    def send(msg: dict) -> None:
+        body = json.dumps(msg).encode("utf-8")
+        header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+        assert proc.stdin is not None
+        proc.stdin.write(header + body)
+        proc.stdin.flush()
+
+    error: str | None = None
+    caps: dict | None = None
+
+    try:
+        try:
+            send({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "processId": os.getpid(),
+                    "rootUri": root_uri,
+                    "clientInfo": {"name": "tilde-check-capabilities", "version": "1"},
+                    "capabilities": {},
+                    "initializationOptions": init_options or {},
+                    "trace": "off",
+                    "workspaceFolders": [{"uri": root_uri, "name": "probe"}],
+                },
+            })
+        except (BrokenPipeError, OSError) as exc:
+            error = f"failed to send initialize: {exc}"
+
+        def _consume(offset: int, state: dict) -> tuple[int, dict | None, str | None]:
+            return _parse_lsp_messages(out_buf.raw(), offset, state)
+
+        def _interpret(response: dict) -> tuple[dict | None, str | None]:
+            if "error" in response:
+                return None, f"initialize returned error: {response['error']}"
+            result = response.get("result")
+            if not isinstance(result, dict):
+                return None, "initialize response missing result object"
+            candidate = result.get("capabilities")
+            if not isinstance(candidate, dict):
+                return None, "result.capabilities is not an object"
+            return candidate, None
+
+        if error is None:
+            deadline = time.monotonic() + timeout
+            offset = 0
+            state: dict = {"cl": None}
+            while time.monotonic() < deadline and caps is None and error is None:
+                offset, response, parse_err = _consume(offset, state)
+                if parse_err:
+                    error = parse_err
+                    break
+                if response is not None:
+                    caps, error = _interpret(response)
+                    break
+                if proc.poll() is not None:
+                    # Child exited; take one last parse pass in case the
+                    # final bytes just arrived.
+                    offset, response, parse_err = _consume(offset, state)
+                    if parse_err:
+                        error = parse_err
+                    elif response is None:
+                        error = f"server exited (returncode={proc.returncode}) before initialize response"
+                    else:
+                        caps, error = _interpret(response)
+                    break
+                time.sleep(0.05)
+            if caps is None and error is None:
+                error = f"no initialize response within {timeout:.0f}s"
+
+        # Best-effort graceful shutdown; failures here fall through to
+        # _cleanup's process-group kill.
+        for msg in (
+            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
+            {"jsonrpc": "2.0", "id": 2, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ):
+            try:
+                send(msg)
+            except (BrokenPipeError, OSError):
+                break
+    finally:
+        _cleanup(proc, stop, threads)
+
+    stderr_text = err_buf.decode()
+    if error:
+        return {"ok": False, "error": error, "capability_keys": [],
+                "capability_count": 0, "stderr_tail": stderr_text[-4000:]}
+    assert caps is not None
+    keys = sorted(caps.keys())
+    return {"ok": True, "error": None, "capability_keys": keys[:24],
+            "capability_count": len(keys), "stderr_tail": stderr_text[-2000:]}
+
+
+# ---------------------------------------------------------------------------
+# Interpreter / tool selection
+# ---------------------------------------------------------------------------
+
+
+def resolve_python_interpreter(override: str | None = None) -> tuple[str, str]:
+    """Pick the Python interpreter under test.
+
+    Precedence:
+      1. explicit ``--python`` argument (never touched by scrubbing);
+      2. ``~/.venv/base/bin/python3`` if executable;
+      3. ``sys.executable``.
+
+    Resolution happens *before* any temp HOME is created, so the value
+    reflects the developer's real environment even though the probes
+    themselves run under a scrubbed HOME. This is the ONLY way to
+    exercise a project-local venv — shell activation and VIRTUAL_ENV
+    are intentionally not consulted because ``clean_env`` drops them.
+    """
+    if override:
+        path = os.path.abspath(os.path.expanduser(override))
+        if not os.path.isfile(path):
+            return path, f"--python override (missing: {override})"
+        if not os.access(path, os.X_OK):
+            return path, f"--python override (not executable: {override})"
+        return path, "--python override"
+    home = Path(os.environ.get("HOME", str(Path.home())))
+    candidate = home / ".venv" / "base" / "bin" / "python3"
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return str(candidate), "base venv (~/.venv/base)"
+    return sys.executable, "sys.executable (base venv absent)"
+
+
+def which(name: str) -> str | None:
+    return shutil.which(name)
+
+
+def _version_probe(cmd: list[str], temp_root: str, timeout: float = 5.0) -> dict:
+    """Run ``cmd`` and return a small dict summarising the version."""
+    r = run_probe(cmd, env=clean_env(temp_root), cwd=temp_root, timeout=timeout)
+    text = (r["stdout"] or "").strip() or (r["stderr"] or "").strip()
+    return {
+        "ok": r["ok"] and bool(text),
+        "version": text.splitlines()[0] if text else None,
+        "returncode": r["returncode"],
+        "timed_out": r["timed_out"],
+        "error": r["error"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Probes: Python
+# ---------------------------------------------------------------------------
+
+PYTHON_UGLY = b"def f(x,y ):\n    return  x+y\n"
+PYTHON_FORMATTED = b"def f(x, y):\n    return x + y\n"
+
+
+def probe_python(temp_root: str, *, python_override: str | None) -> list[dict]:
+    interpreter, source = resolve_python_interpreter(python_override)
+    exists = os.path.isfile(interpreter)
+    version = _version_probe([interpreter, "-V"], temp_root) if exists else {
+        "ok": False, "version": None, "returncode": None,
+        "timed_out": False, "error": "interpreter path does not exist",
+    }
+    results: list[dict] = [{
+        "name": "python.interpreter",
+        "required": True,
+        "ok": exists and version["ok"],
+        "detail": {"path": interpreter, "source": source, **version},
+    }]
+
+    ws = os.path.join(temp_root, "py")
+    os.makedirs(ws, exist_ok=True)
+
+    # pytest tiny test
+    test_file = os.path.join(ws, "test_probe.py")
+    Path(test_file).write_text("def test_arith():\n    assert 1 + 1 == 2\n")
+    pytest_env = clean_env(temp_root, extra={
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PIP_NO_INDEX": "1",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        # Refuse implicit pytest-plugin discovery so any base-venv-installed
+        # plugin cannot run collect/conftest hooks against our synthetic
+        # test file.
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    })
+    pytest_run = run_probe(
+        [interpreter, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider", test_file],
+        env=pytest_env, cwd=ws, timeout=30.0,
+    )
+    results.append({
+        "name": "python.pytest",
+        "required": True,
+        "ok": pytest_run["ok"],
+        "detail": pytest_run,
+        "notes": ("pytest module not importable in interpreter"
+                  if not pytest_run["ok"] and "No module named pytest" in pytest_run["stderr"]
+                  else None),
+    })
+
+    # ruff format via stdin
+    ruff = which("ruff")
+    if ruff is None:
+        results.append({"name": "python.ruff_format", "required": True, "ok": False,
+                        "detail": {"error": "ruff not on PATH"}})
+    else:
+        r = run_probe([ruff, "format", "--stdin-filename=probe.py", "-"],
+                      env=clean_env(temp_root), cwd=ws, stdin=PYTHON_UGLY, timeout=10.0)
+        got = r["stdout"].encode("utf-8") if isinstance(r["stdout"], str) else r["stdout"]
+        results.append({
+            "name": "python.ruff_format",
+            "required": True,
+            "ok": r["ok"] and got == PYTHON_FORMATTED,
+            "detail": {**r, "expected": PYTHON_FORMATTED.decode(),
+                       "matched": got == PYTHON_FORMATTED},
+        })
+
+    # pyright-langserver initialize
+    pyright = which("pyright-langserver")
+    if pyright is None:
+        results.append({"name": "python.pyright_langserver", "required": True, "ok": False,
+                        "detail": {"error": "pyright-langserver not on PATH"}})
+    else:
+        h = lsp_initialize(
+            [pyright, "--stdio"],
+            env=clean_env(temp_root, extra={"PYRIGHT_PYTHON_FORCE_VERSION": ""}),
+            cwd=ws, root_uri=Path(ws).as_uri(),
+            init_options={"python": {"pythonPath": interpreter}},
+        )
+        results.append({"name": "python.pyright_langserver", "required": True,
+                        "ok": h["ok"], "detail": h})
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Probes: Node
+# ---------------------------------------------------------------------------
+
+NODE_TEST_JS = b"""\
+const test = require('node:test');
+const assert = require('node:assert');
+test('adds', () => { assert.strictEqual(1 + 1, 2); });
+"""
+
+TS_FIXTURE = b"export const answer: number = 42;\nexport function greet(n: string): string { return `hi ${n}`; }\n"
+TSCONFIG = json.dumps({
+    "compilerOptions": {
+        "strict": True,
+        "target": "es2022",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "noEmit": True,
+        "skipLibCheck": True,
+        "isolatedModules": True,
+        "types": [],
+    },
+    "typeAcquisition": {"enable": False},
+    "include": ["*.ts"],
+}).encode()
+
+PRETTIER_UGLY = b"const   x=1;const y   =2\n"
+PRETTIER_FORMATTED = b"const x = 1;\nconst y = 2;\n"
+
+
+def probe_node(temp_root: str) -> list[dict]:
+    results: list[dict] = []
+    node = which("node")
+    version = _version_probe([node, "--version"], temp_root) if node else {
+        "ok": False, "version": None, "returncode": None,
+        "timed_out": False, "error": "node not on PATH",
+    }
+    results.append({
+        "name": "node.runtime",
+        "required": True,
+        "ok": node is not None and version["ok"],
+        "detail": {"path": node, **version},
+    })
+
+    ws = os.path.join(temp_root, "js")
+    os.makedirs(ws, exist_ok=True)
+    (Path(ws) / "package.json").write_text('{"name":"probe","private":true,"type":"commonjs"}\n')
+
+    if node is not None:
+        test_file = os.path.join(ws, "probe.test.js")
+        Path(test_file).write_bytes(NODE_TEST_JS)
+        r = run_probe([node, "--test", test_file],
+                      env=clean_env(temp_root, extra={"NODE_OPTIONS": ""}),
+                      cwd=ws, timeout=20.0)
+        results.append({"name": "node.test_runner", "required": True,
+                        "ok": r["ok"], "detail": r})
+    else:
+        results.append({"name": "node.test_runner", "required": True, "ok": False,
+                        "detail": {"error": "node not on PATH"}})
+
+    tsc = which("tsc")
+    if tsc is None:
+        results.append({"name": "node.tsc_noemit", "required": True, "ok": False,
+                        "detail": {"error": "tsc not on PATH"}})
+    else:
+        ts_ws = os.path.join(temp_root, "ts")
+        os.makedirs(ts_ws, exist_ok=True)
+        (Path(ts_ws) / "probe.ts").write_bytes(TS_FIXTURE)
+        (Path(ts_ws) / "tsconfig.json").write_bytes(TSCONFIG)
+        r = run_probe([tsc, "--noEmit", "--project", "tsconfig.json"],
+                      env=clean_env(temp_root), cwd=ts_ws, timeout=30.0)
+        results.append({"name": "node.tsc_noemit", "required": True,
+                        "ok": r["ok"], "detail": r})
+
+    prettier = which("prettier")
+    if prettier is None:
+        results.append({"name": "node.prettier_stdin", "required": True, "ok": False,
+                        "detail": {"error": "prettier not on PATH"}})
+    else:
+        r = run_probe([prettier, "--stdin-filepath=probe.js"],
+                      env=clean_env(temp_root), cwd=ws,
+                      stdin=PRETTIER_UGLY, timeout=15.0)
+        got = r["stdout"].encode("utf-8") if isinstance(r["stdout"], str) else r["stdout"]
+        results.append({
+            "name": "node.prettier_stdin",
+            "required": True,
+            "ok": r["ok"] and got == PRETTIER_FORMATTED,
+            "detail": {**r, "expected": PRETTIER_FORMATTED.decode(),
+                       "matched": got == PRETTIER_FORMATTED},
+        })
+
+    tsls = which("typescript-language-server")
+    if tsls is None:
+        results.append({"name": "node.typescript_language_server", "required": True,
+                        "ok": False, "detail": {"error": "typescript-language-server not on PATH"}})
+    else:
+        ts_ws = os.path.join(temp_root, "tsls")
+        os.makedirs(ts_ws, exist_ok=True)
+        (Path(ts_ws) / "tsconfig.json").write_bytes(TSCONFIG)
+        (Path(ts_ws) / "probe.ts").write_bytes(TS_FIXTURE)
+        h = lsp_initialize(
+            [tsls, "--stdio"],
+            env=clean_env(temp_root),
+            cwd=ts_ws, root_uri=Path(ts_ws).as_uri(),
+            init_options={
+                "disableAutomaticTypingAcquisition": True,
+                "tsserver": {"disableAutomaticTypingAcquisition": True},
+                "preferences": {"disableSuggestions": True},
+            },
+        )
+        results.append({"name": "node.typescript_language_server", "required": True,
+                        "ok": h["ok"], "detail": h})
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Probes: Go
+# ---------------------------------------------------------------------------
+
+GO_MOD = b"module tildeprobe\n\ngo 1.21\n"
+GO_TEST = b"""\
+package tildeprobe
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+    if 1+1 != 2 {
+        t.Fatal("arithmetic failed")
+    }
+}
+"""
+
+GOFMT_UGLY = b"package p\nfunc F( ){return }\n"
+GOFMT_FORMATTED = b"package p\n\nfunc F() { return }\n"
+
+GOIMPORTS_INPUT = b"""\
+package p
+
+func F() string {
+\treturn fmt.Sprintf("hello %s", strings.ToUpper("x"))
+}
+"""
+
+
+def go_env(temp_root: str) -> dict[str, str]:
+    """Env for every Go probe: offline flags, temp caches, telemetry off."""
+    return clean_env(temp_root, extra={
+        "GOPROXY": "off",
+        "GOSUMDB": "off",
+        "GOTOOLCHAIN": "local",
+        "GOTELEMETRY": "off",
+        "GOFLAGS": "-mod=mod",
+        "GOCACHE": os.path.join(temp_root, "gocache"),
+        "GOMODCACHE": os.path.join(temp_root, "gomodcache"),
+        "GOPATH": os.path.join(temp_root, "gopath"),
+        "GOENV": os.path.join(temp_root, "goenv"),
+    })
+
+
+def probe_go(temp_root: str) -> list[dict]:
+    results: list[dict] = []
+    go = which("go")
+    version = _version_probe([go, "version"], temp_root) if go else {
+        "ok": False, "version": None, "returncode": None,
+        "timed_out": False, "error": "go not on PATH",
+    }
+    results.append({"name": "go.runtime", "required": True,
+                    "ok": go is not None and version["ok"],
+                    "detail": {"path": go, **version}})
+
+    ws = os.path.join(temp_root, "go")
+    os.makedirs(ws, exist_ok=True)
+    (Path(ws) / "go.mod").write_bytes(GO_MOD)
+    (Path(ws) / "probe_test.go").write_bytes(GO_TEST)
+
+    if go is not None:
+        r = run_probe([go, "test", "-count=1", "./..."],
+                      env=go_env(temp_root), cwd=ws, timeout=60.0)
+        results.append({"name": "go.test", "required": True,
+                        "ok": r["ok"], "detail": r})
+    else:
+        results.append({"name": "go.test", "required": True, "ok": False,
+                        "detail": {"error": "go not on PATH"}})
+
+    gofmt = which("gofmt")
+    if gofmt is None:
+        results.append({"name": "go.gofmt", "required": True, "ok": False,
+                        "detail": {"error": "gofmt not on PATH"}})
+    else:
+        r = run_probe([gofmt], env=clean_env(temp_root), cwd=ws,
+                      stdin=GOFMT_UGLY, timeout=10.0)
+        got = r["stdout"].encode("utf-8") if isinstance(r["stdout"], str) else r["stdout"]
+        results.append({
+            "name": "go.gofmt",
+            "required": True,
+            "ok": r["ok"] and got == GOFMT_FORMATTED,
+            "detail": {**r, "expected": GOFMT_FORMATTED.decode(),
+                       "matched": got == GOFMT_FORMATTED},
+        })
+
+    goimports = which("goimports")
+    if goimports is None:
+        results.append({
+            "name": "go.goimports",
+            "required": False,
+            "ok": False,
+            "detail": {"error": "goimports not on PATH (optional)"},
+        })
+    else:
+        r = run_probe([goimports], env=go_env(temp_root), cwd=ws,
+                      stdin=GOIMPORTS_INPUT, timeout=10.0)
+        got = r["stdout"] if isinstance(r["stdout"], str) else r["stdout"].decode("utf-8", "replace")
+        added_imports = "\"fmt\"" in got and "\"strings\"" in got
+        results.append({
+            "name": "go.goimports",
+            "required": False,
+            "ok": r["ok"] and added_imports,
+            "detail": {**r, "added_fmt_and_strings": added_imports},
+        })
+
+    gopls = which("gopls")
+    if gopls is None:
+        results.append({"name": "go.gopls", "required": True, "ok": False,
+                        "detail": {"error": "gopls not on PATH"}})
+    else:
+        h = lsp_initialize(
+            [gopls, "-mode=stdio"],
+            env=go_env(temp_root), cwd=ws, root_uri=Path(ws).as_uri(),
+            init_options={},
+        )
+        results.append({"name": "go.gopls", "required": True,
+                        "ok": h["ok"], "detail": h})
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+
+def render_summary(report: dict) -> str:
+    lines: list[str] = []
+    lines.append(f"capabilities: {len(report['probes'])} probe(s)")
+    for p in report["probes"]:
+        marker = "OK  " if p["ok"] else ("MISS" if not p["required"] else "FAIL")
+        req = " (optional)" if not p["required"] else ""
+        note = p.get("notes")
+        extra = f" — {note}" if note else ""
+        lines.append(f"  {marker} {p['name']}{req}{extra}")
+    if report["missing_required"]:
+        lines.append("REQUIRED MISSING/FAILING: " + ", ".join(report["missing_required"]))
+    if report["missing_optional"]:
+        lines.append("optional missing (informational): " + ", ".join(report["missing_optional"]))
+    lines.append("verdict: OK" if report["ok"] else "verdict: PROBLEMS FOUND")
+    return "\n".join(lines) + "\n"
+
+
+def build_report(probes: list[dict]) -> dict:
+    missing_required = [p["name"] for p in probes if p["required"] and not p["ok"]]
+    missing_optional = [p["name"] for p in probes if not p["required"] and not p["ok"]]
+    return {
+        "ok": not missing_required,
+        "probes": probes,
+        "missing_required": missing_required,
+        "missing_optional": missing_optional,
+    }
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    parser.add_argument("--only", choices=("python", "node", "go", "all"),
+                        default="all", help="Restrict to one language group.")
+    parser.add_argument("--summary", action="store_true",
+                        help="Emit only the human summary on stderr; no JSON.")
+    parser.add_argument("--python", metavar="EXECUTABLE", default=None,
+                        help=("Absolute path to a Python interpreter under test "
+                              "(e.g. a project venv's ./bin/python3). Overrides "
+                              "the default base-venv preference."))
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    # Resolve --python BEFORE any temp HOME so the developer's real
+    # environment is used to locate the interpreter, not the scrubbed one.
+    _resolved = resolve_python_interpreter(args.python) if args.only in ("python", "all") else None
+    with tempfile.TemporaryDirectory(prefix="tilde-caps-") as temp_root:
+        probes: list[dict] = []
+        if args.only in ("python", "all"):
+            probes += probe_python(temp_root, python_override=args.python)
+        if args.only in ("node", "all"):
+            probes += probe_node(temp_root)
+        if args.only in ("go", "all"):
+            probes += probe_go(temp_root)
+    report = build_report(probes)
+    if _resolved is not None:
+        report["python_interpreter"] = {"path": _resolved[0], "source": _resolved[1]}
+    if not args.summary:
+        json.dump(report, sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+    sys.stderr.write(render_summary(report))
+    return 0 if report["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -58,6 +58,11 @@ Python and its possibly unsupported syntax.
   Node 22.13+ on the 22.x line, or Node 24. CI selects Node 22 explicitly in
   `.github/workflows/check.yml`; no Pi installation is needed.
 
+`make capabilities` is a separate, explicit check of installed compilers,
+formatters, test runners and LSP initialization. Its failure-path tests run in
+`make verify`; real language tools are not a standard CI requirement. See
+[development-capabilities.md](development-capabilities.md) for scope and gaps.
+
 The GitHub Actions job runs `make verify` on macOS without Stow deployment,
 credentials, user data, or an editor-package bootstrap. Tool installation is
 an explicit CI preparation step. The runner image/Homebrew packages are not
