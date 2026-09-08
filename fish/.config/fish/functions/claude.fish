@@ -4,5 +4,8 @@ function claude --description "Claude Code with lazy Honcho credential load"
     # Interactive shells stay fast by not eagerly running `op read`; load the
     # credential just-in-time here so each Claude Code session inherits it.
     test -z "$HONCHO_API_KEY"; and honcho_load
-    command /Users/jth/.local/bin/claude $argv
+    # `command claude` bypasses this function without hard-coding an
+    # install path. Volta / uv / brew can move the binary — fish resolves
+    # it via PATH at call time.
+    command claude $argv
 end

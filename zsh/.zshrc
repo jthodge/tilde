@@ -1,101 +1,71 @@
-# Terminal
+# Legacy zsh — fish is the primary interactive shell (see AGENTS.md).
+# Kept working so a direct `zsh` invocation stays usable, but without
+# any startup-time secret fetches or environment provisioning.
 
-## Prevent `complete:13: command not found: compdef`
-## https://stackoverflow.com/questions/66338988/complete13-command-not-found-compdef
-## TODO: resolve without this autoload
+# Terminal completion
 autoload -Uz compinit
 compinit
 
-## bat (https://github.com/sharkdp/bat)
+# Aliases — modern CLI replacements
 alias cat=bat
-
-## eza (https://github.com/eza-community/eza)
 alias ls=eza
-
-## fd (https://github.com/sharkdp/fd)
 alias find=fd
-
-## procs (https://github.com/dalance/procs)
 alias ps=procs
-
-## dust (https://github.com/bootandy/dust)
 alias du=dust
 
-## Spaceship Prompt (https://spaceship-prompt.sh/)
-source /opt/homebrew/opt/spaceship/spaceship.zsh
-
-## fzf  (https://github.com/junegunn/fzf)
-source <(fzf --zsh)
-
-## zoxide (https://github.com/ajeetdsouza/zoxide)
-eval "$(zoxide init zsh)"
-
-# Development Tooling
-
-## C
-
-### Compiler
+# Development tooling
 alias gcc=/opt/homebrew/bin/gcc-14
+alias pip="uv pip"
 
-## Haskell
+# Prompt
+[ -r /opt/homebrew/opt/spaceship/spaceship.zsh ] \
+    && source /opt/homebrew/opt/spaceship/spaceship.zsh
 
-### GHCup
-[ -f "/Users/jth/.ghcup/env" ] && . "/Users/jth/.ghcup/env"
+# Integrations — all guarded by command availability so a missing tool
+# never breaks startup.
+command -v fzf    >/dev/null 2>&1 && source <(fzf --zsh)
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+command -v uv     >/dev/null 2>&1 && eval "$(uv generate-shell-completion zsh)"
+command -v mise   >/dev/null 2>&1 && eval "$(mise activate zsh)"
+command -v ngrok  >/dev/null 2>&1 && eval "$(ngrok completion)"
 
-## OCaml
+# Legacy language toolchains — sourced only if still installed.
+[ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
+[ -r "$HOME/.opam/opam-init/init.zsh" ] \
+    && source "$HOME/.opam/opam-init/init.zsh" > /dev/null 2>&1
 
-### opam
-# BEGIN opam configuration
-# This is useful if you're using opam as it adds:
-#   - the correct directories to the PATH
-#   - auto-completion for the opam binary
-# This section can be safely removed at any time if needed.
-[[ ! -r '/Users/jth/.opam/opam-init/init.zsh' ]] || source '/Users/jth/.opam/opam-init/init.zsh' > /dev/null 2> /dev/null
-# END opam configuration
-
-## Python
-
-### uv
-eval "$(uv generate-shell-completion zsh)"
-
-# Ensures:
-# 1. A default venv (`base`) is always active if no other venv is active
-# 2. `pip` is aliased to `uv pip`
-# 3. Util function `activate` is provided to deactivate an existing venv before
-# activating a new venv
-export UV_DEFAULT_VENV="base"
-if [ -z "$VIRTUAL_ENV" ]; then  # Only activate if no venv is currently active
-    if [ ! -d "$HOME/.venv/$UV_DEFAULT_VENV" ]; then
-        uv venv "$HOME/.venv/$UV_DEFAULT_VENV"
-    fi
+# Python — activate an existing base venv only. Never create.
+export UV_DEFAULT_VENV="${UV_DEFAULT_VENV:-base}"
+if [ "${TILDE_AUTO_VENV:-1}" != 0 ] && [ -z "$VIRTUAL_ENV" ] && [ -f "$HOME/.venv/$UV_DEFAULT_VENV/bin/activate" ]; then
     source "$HOME/.venv/$UV_DEFAULT_VENV/bin/activate"
 fi
 
-alias pip="uv pip"
-
-function activate() {
-    if [ -n "$VIRTUAL_ENV" ]; then
-        deactivate
-    fi
+# activate — deactivate any current venv, then source the target.
+activate() {
+    [ -n "$VIRTUAL_ENV" ] && deactivate
     source "$1/bin/activate"
 }
 
-# Networking
-
-## ngrok
-
-if command -v ngrok > /dev/null; then
-    eval "$(ngrok completion)"
-fi
-
-# Agents
-
-## Claude
-
+# Go — g-install manages this line; do not edit. See https://github.com/stefanmaric/g
 export GOPATH="$HOME/go"; export GOROOT="$HOME/.go"; export PATH="$GOPATH/bin:$PATH"; # g-install: do NOT edit, see https://github.com/stefanmaric/g
 
-eval "$(mise activate zsh)"
-
-## Honcho
-export HONCHO_API_KEY="$(op read 'op://Personal/Honcho/credential' 2>/dev/null)"
+# Agents — lazy credential load.
+#
+# HONCHO_API_KEY is not exported at startup: `op read` is slow, prompts on
+# a locked vault, and leaks the secret to every subprocess. Fetch it just
+# in time when honcho / claude are actually invoked.
 export HONCHO_PEER_NAME="taylor"
+
+honcho_load() {
+    export HONCHO_API_KEY="$(op read 'op://Personal/Honcho/credential' 2>/dev/null)"
+}
+
+honcho() (
+    [ -z "$HONCHO_API_KEY" ] && honcho_load
+    command honcho "$@"
+)
+
+claude() (
+    [ -z "$HONCHO_API_KEY" ] && honcho_load
+    command claude "$@"
+)

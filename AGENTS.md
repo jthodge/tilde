@@ -37,8 +37,8 @@ Discipline for any agent (human or otherwise) that touches this repo.
 ## Terminals
 
 - Primary: **Alacritty** (`alacritty/.config/alacritty/alacritty.toml`).
-  No window decorations, Berkeley Mono 10pt, dynamic padding, zsh
-  login shell. Dock-pin manually.
+  No window decorations, Berkeley Mono 10pt, dynamic padding, fish
+  login shell (`/opt/homebrew/bin/fish -l`). Dock-pin manually.
 - Fallback: **Ghostty** (`ghostty/.config/ghostty/config`). Same
   font and font-size for visual continuity. Kept for cases where
   Ghostty's split keybindings or its specific GPU compositing
