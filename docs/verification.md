@@ -22,8 +22,8 @@ Python and its possibly unsupported syntax.
 
 - **Lint:** tracked fish/zsh/Bash syntax, Python/JSON/YAML parsing, Brewfile
   Ruby syntax, Lisp parentheses, Neovim Lua syntax/key declarations, whitespace.
-  ShellCheck covers the maintained deployment/bootstrap/cleanup/link helpers;
-  it does not claim to lint every legacy shell function or Git hook.
+  ShellCheck covers the maintained deployment/bootstrap/cleanup/link helpers
+  and the staged-secret hook; it does not cover every legacy shell function.
 - **Types:** Python doctor, seeder, verification runner, and regression tests.
   Dynamic Lisp/Lua behavior is covered by targeted tests, not a static type
   system. Existing agent TypeScript extensions are not typechecked here.
@@ -40,6 +40,10 @@ Python and its possibly unsupported syntax.
 - **tmux:** a private socket, temporary home, stub plugin, and `sleep` process;
   repeated config loads are idempotent. No production pane is killed. This
   host-specific test is skipped when Apple Silicon fish/tmux are unavailable.
+- **Git and deployment:** scanner tests inspect staged blobs, including binary
+  data and type changes, without printing synthetic matches. Baseline fixtures
+  use tree/index objects, not commits. Checker tests cover ownership, missing
+  dependencies, malformed manifests, and Git/path inspection failures.
 - **Policy:** targeted text checks prevent known signing/publication conflicts.
   They do not prove that an agent will obey prose or that heuristic permission
   guards are a sandbox.

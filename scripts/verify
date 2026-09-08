@@ -50,7 +50,7 @@ def lint():
         elif relative == "bash/.bash_profile" or path.read_bytes().startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash")):
             run("bash", "-n", str(path))
     run("shellcheck", "--severity=warning", "scripts/check", "scripts/ddr", "scripts/dwr",
-        "scripts/setup-tools", "bin/.local/bin/uv-python-simlink")
+        "scripts/setup-tools", "bin/.local/bin/uv-python-simlink", "git/.config/git/hooks/pre-commit")
     run("ruby", "-c", "Brewfile")
     run("emacs", "-Q", "--batch", "-l", "scripts/tests/emacs-syntax.el")
     run("nvim", "--headless", "--clean", "-l", "scripts/tests/nvim.lua")

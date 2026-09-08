@@ -1,35 +1,65 @@
 #!/usr/bin/env bash
-# Block commits whose staged content matches known secret patterns.
-# Conservative by design: false positives are preferred over leaks.
-# Bypass only via `git commit --no-verify` after manual review.
-
+# Scan staged file blobs, never worktree content or removed diff lines.
+# Report rules and paths only; never echo matching credential values.
 set -euo pipefail
+umask 077
 
-declare -a PATTERNS=(
-    'hch-v3-[a-z0-9]{32,}'                     # Honcho v3 API key
-    'sk-ant-[a-zA-Z0-9_-]{32,}'                # Anthropic API key
-    'sk-[a-zA-Z0-9]{40,}'                      # OpenAI / generic sk-
-    'ghp_[a-zA-Z0-9]{36,}'                     # GitHub personal access token
-    'github_pat_[a-zA-Z0-9_]{50,}'             # GitHub fine-grained PAT
-    'AKIA[0-9A-Z]{16}'                         # AWS access key ID
-    'xox[bp]-[0-9]+-[0-9]+-[a-zA-Z0-9-]+'      # Slack bot/user token
+LABELS=(
+    'Honcho v3 API key' 'Anthropic API key' 'OpenAI / generic sk-'
+    'GitHub personal access token' 'GitHub fine-grained PAT'
+    'AWS access key ID' 'Slack bot/user token'
 )
+PATTERNS=(
+    'hch-v3-[a-z0-9]{32,}' 'sk-ant-[a-zA-Z0-9_-]{32,}'
+    'sk-[a-zA-Z0-9]{40,}' 'ghp_[a-zA-Z0-9]{36,}'
+    'github_pat_[a-zA-Z0-9_]{50,}' 'AKIA[0-9A-Z]{16}'
+    'xox[bp]-[0-9]+-[0-9]+-[a-zA-Z0-9-]+'
+)
+abort() { printf 'pre-commit: aborting — %s\n' "$1" >&2; exit 1; }
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/tilde-precommit.XXXXXX") || abort 'mktemp failed'
+trap 'rm -rf "$scratch"' EXIT
 
-staged=$(git diff --cached --no-color -U0)
-
-blocked=0
-for pat in "${PATTERNS[@]}"; do
-    hits=$(printf '%s\n' "$staged" | grep -nE "$pat" || true)
-    if [ -n "$hits" ]; then
-        printf 'pre-commit: blocked — staged content matches /%s/\n' "$pat" >&2
-        printf '%s\n' "$hits" >&2
-        blocked=1
-    fi
-done
-
-if [ "$blocked" -eq 1 ]; then
-    printf '\npre-commit: aborting. Escape only via `git commit --no-verify` after manual review.\n' >&2
-    exit 1
+# Normalize renames to deletion + addition so only the destination is read.
+# T includes file/symlink type changes; U will fail the stage-0 blob lookup.
+if ! git diff --cached --no-renames --name-only -z --diff-filter=ACMTU > "$scratch/names"; then
+    abort 'git diff enumeration failed'
 fi
-
-exit 0
+blocked=0
+while IFS= read -r -d '' name; do
+    display=$name
+    # Avoid leaking a credential even when it occurs in a filename.
+    printf '%s' "$name" > "$scratch/name"
+    for pat in "${PATTERNS[@]}"; do
+        rc=0
+        LC_ALL=C grep -aE -- "$pat" "$scratch/name" >/dev/null || rc=$?
+        case "$rc" in
+            0) display='[redacted file name]' ;;
+            1) : ;;
+            *) abort 'grep failed while inspecting a file name' ;;
+        esac
+    done
+    entry=$(git --literal-pathspecs ls-files --stage -- "$name") \
+        || abort "cannot inspect staged entry: $display"
+    # Gitlinks reference another repository's commit, not a file blob.
+    [ "${entry%% *}" != 160000 ] || continue
+    if ! git cat-file blob ":0:$name" > "$scratch/blob" 2>/dev/null; then
+        abort "cannot read staged blob: $display"
+    fi
+    i=0
+    while [ "$i" -lt "${#PATTERNS[@]}" ]; do
+        rc=0
+        # Do not use -q: consume the complete blob, without pipe/SIGPIPE races.
+        LC_ALL=C grep -aE -- "${PATTERNS[$i]}" "$scratch/blob" >/dev/null || rc=$?
+        case "$rc" in
+            0)
+                printf 'pre-commit: blocked — %s pattern in %q\n' "${LABELS[$i]}" "$display" >&2
+                blocked=1 ;;
+            1) : ;;
+            *) abort "grep failed while scanning: $display" ;;
+        esac
+        i=$((i + 1))
+    done
+done < "$scratch/names"
+if [ "$blocked" -eq 1 ]; then
+    abort 'remove the credential from staged content and retry'
+fi

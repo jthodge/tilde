@@ -13,7 +13,11 @@
 # The script also reports a directory that looks like a stow package
 # but that .stow-packages does not list.
 #
-# The script writes nothing. It exits 1 if it finds a problem.
+# The script changes neither the checkout nor deployed files; it uses
+# temporary listing files. It exits 1 if it finds a problem, and
+# fails closed (also 1) on a missing dependency, an unreadable
+# manifest, or a failed Git enumeration — silence would otherwise
+# masquerade as agreement.
 #
 # Usage:
 #   scripts/check              # every declared package
@@ -26,75 +30,132 @@ cd "$REPO" || exit 1
 # Directories that are deliberately not stow packages.
 NOT_PACKAGES=(docs scripts .github)
 
+abort() {
+    printf 'check: aborting — %s\n' "$1" >&2
+    exit 1
+}
+
+# Fail closed on a missing dependency. Empty realpath output was
+# previously indistinguishable from a successful match, so a machine
+# without realpath silently reported every entry as "OK".
+for tool in git realpath mktemp awk grep sort; do
+    command -v "$tool" >/dev/null 2>&1 \
+        || abort "required tool not on PATH: $tool"
+done
+
+if [ ! -f .stow-packages ]; then
+    abort ".stow-packages manifest is missing"
+fi
+
 declared() { grep -v '^#' .stow-packages | grep -v '^[[:space:]]*$'; }
+
+# Accept repo-level package names only, not traversal or Git pathspec syntax.
+# Arguments remain quoted regardless of this validation.
+validate_pkg() {
+    case "$1" in
+        ''|.|..|-*) abort "empty, dotted or option-like package name in .stow-packages" ;;
+        */*|*[!A-Za-z0-9_.-]*)
+            abort "malformed package name in .stow-packages: $1" ;;
+    esac
+}
 
 # macOS ships bash 3.2, which has no `mapfile`; read the list by hand.
 PACKAGES=()
 if [ "$#" -gt 0 ]; then
-  PACKAGES=("$@")
+    for pkg in "$@"; do
+        validate_pkg "$pkg"
+        PACKAGES+=("$pkg")
+    done
 else
-  while IFS= read -r line; do
-    PACKAGES+=("$line")
-  done < <(declared)
+    manifest=$(mktemp -t tilde-check.XXXXXX) || abort "mktemp failed"
+    trap 'rm -f "$manifest"' EXIT
+    if ! declared > "$manifest"; then
+        abort "cannot read .stow-packages"
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do
+        validate_pkg "$line"
+        PACKAGES+=("$line")
+    done < "$manifest"
 fi
 
 problems=0
 checked=0
 
+# Temp buffer for `git ls-files -z` output. A process substitution
+# would swallow a nonzero git exit; a real pipeline lets us detect it.
+listing=$(mktemp -t tilde-check.XXXXXX) || abort "mktemp failed"
+tracked=$(mktemp -t tilde-check.XXXXXX) || abort "mktemp failed"
+trap 'rm -f "${manifest:-}" "$listing" "$tracked"' EXIT
+
 for pkg in "${PACKAGES[@]}"; do
-  if [ ! -d "$pkg" ]; then
-    printf 'DRIFT    %-38s declared in .stow-packages, absent from the repo\n' "$pkg"
-    problems=$((problems + 1))
-    continue
-  fi
-
-  while IFS= read -r -d '' rel; do
-    # Stow control files are not deployed. Claude settings are seed-only:
-    # scripts/seed-configs preserves app-owned regular files byte-for-byte.
-    case "$rel" in */.stow-local-ignore) continue ;; esac
-    target="$HOME/${rel#"$pkg"/}"
-    checked=$((checked + 1))
-    if [ "$rel" = "claude/.claude/settings.json" ]; then
-      if [ ! -f "$target" ] || [ -L "$target" ]; then
-        printf 'DRIFT    %-38s expected an app-owned file; run make switch\n' "$rel"
+    if [ ! -d "$pkg" ]; then
+        printf 'DRIFT    %-38s declared in .stow-packages, absent from the repo\n' "$pkg"
         problems=$((problems + 1))
-      fi
-      continue
+        continue
     fi
 
-    if [ ! -e "$target" ] && [ ! -L "$target" ]; then
-      printf 'MISSING  %-38s %s\n' "$rel" "$target"
-      problems=$((problems + 1))
-      continue
+    if ! git ls-files -z -- "$pkg" > "$listing"; then
+        abort "git ls-files failed for $pkg"
     fi
 
-    want="$(realpath "$REPO/$rel" 2>/dev/null)"
-    got="$(realpath "$target" 2>/dev/null)"
+    while IFS= read -r -d '' rel; do
+        # Stow control files are not deployed. Claude settings are seed-only:
+        # scripts/seed-configs preserves app-owned regular files byte-for-byte.
+        case "$rel" in */.stow-local-ignore) continue ;; esac
+        target="$HOME/${rel#"$pkg"/}"
+        checked=$((checked + 1))
+        if [ "$rel" = "claude/.claude/settings.json" ]; then
+            if [ ! -f "$target" ] || [ -L "$target" ]; then
+                printf 'DRIFT    %-38s expected an app-owned file; run make switch\n' "$rel"
+                problems=$((problems + 1))
+            fi
+            continue
+        fi
 
-    if [ "$want" != "$got" ]; then
-      printf 'DRIFT    %-38s %s\n' "$rel" "$target -> ${got:-unresolvable}"
-      problems=$((problems + 1))
-    fi
-  done < <(git ls-files -z -- "$pkg")
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+            printf 'MISSING  %-38s %s\n' "$rel" "$target"
+            problems=$((problems + 1))
+            continue
+        fi
+
+        # The repo file must resolve; if it does not, the checkout is
+        # broken and we would otherwise compare two empty strings and
+        # report a false OK.
+        if ! want=$(realpath -- "$REPO/$rel" 2>/dev/null); then
+            abort "cannot resolve tracked file $rel"
+        fi
+        [ -n "$want" ] || abort "empty resolution for tracked file $rel"
+        got=$(realpath -- "$target" 2>/dev/null) || got=""
+
+        if [ -z "$got" ] || [ "$want" != "$got" ]; then
+            printf 'DRIFT    %-38s %s\n' "$rel" "$target -> ${got:-unresolvable}"
+            problems=$((problems + 1))
+        fi
+    done < "$listing"
 done
 
 # A tracked top-level directory that no one declared is a package that
 # a fresh bootstrap would skip. This is how the fish package went
 # undeployed for months.
 if [ "$#" -eq 0 ]; then
-  while IFS= read -r dir; do
-    case " ${NOT_PACKAGES[*]} " in *" $dir "*) continue ;; esac
-    if ! declared | grep -qx "$dir"; then
-      printf 'UNDECLARED %-36s tracked directory, absent from .stow-packages\n' "$dir"
-      problems=$((problems + 1))
+    if ! git ls-files > "$tracked"; then
+        abort "git ls-files failed while scanning for undeclared packages"
     fi
-  done < <(git ls-files | awk -F/ 'NF > 1 {print $1}' | sort -u)
+    dirs=$(awk -F/ 'NF > 1 {print $1}' "$tracked" | sort -u) || abort "awk/sort pipeline failed"
+    while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        case " ${NOT_PACKAGES[*]} " in *" $dir "*) continue ;; esac
+        if ! declared | grep -qx "$dir"; then
+            printf 'UNDECLARED %-36s tracked directory, absent from .stow-packages\n' "$dir"
+            problems=$((problems + 1))
+        fi
+    done <<< "$dirs"
 fi
 
 echo
 if [ "$problems" -eq 0 ]; then
-  echo "OK: $checked tracked deployment entries match their ownership rules"
-  exit 0
+    echo "OK: $checked tracked deployment entries match their ownership rules"
+    exit 0
 fi
 echo "$problems problem(s) across $checked tracked files."
 echo "Fix with: make switch   (then re-run make check)"
