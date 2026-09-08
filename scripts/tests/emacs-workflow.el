@@ -26,6 +26,9 @@
 (defconst tilde-workflow--modules-dir
   (expand-file-name "emacs/.emacs.d/modules" tilde-workflow--repo-root))
 
+;; workflow.el does `(require 'proj-context)'; make it findable.
+(add-to-list 'load-path tilde-workflow--modules-dir)
+
 (defun tilde-workflow--load ()
   (load (expand-file-name "workflow.el" tilde-workflow--modules-dir)
         nil t t))
@@ -54,15 +57,21 @@
 (defmacro tilde-workflow--with-tree (root &rest body)
   (declare (indent 1) (debug (symbolp body)))
   `(let ((,root (file-name-as-directory
-                 (make-temp-file "tilde-workflow-" t))))
+                 (file-truename (make-temp-file "tilde-workflow-" t)))))
      (unwind-protect (progn ,@body)
        (when (file-directory-p ,root) (delete-directory ,root t)))))
 
 (defmacro tilde-workflow--with-root (root &rest body)
-  "Run BODY with `my/workflow--project-root' pinned to ROOT."
+  "Run BODY with `my/workflow--project-root' and the shared
+`my/proj--vcs-root' both pinned to ROOT. Test temp directories
+live outside any real project, so `project-current' returns nil
+and `scope-root' would otherwise not resolve to ROOT for buffer-
+less calls; pinning both keeps the pre-refactor semantics."
   (declare (indent 1) (debug (symbolp body)))
   `(cl-letf (((symbol-function 'my/workflow--project-root)
-              (lambda () ,root)))
+              (lambda () ,root))
+             ((symbol-function 'my/proj--vcs-root)
+              (lambda (&rest _) ,root)))
      ,@body))
 
 (defun tilde-workflow--touch (path)

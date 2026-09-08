@@ -59,6 +59,12 @@
 (defconst tilde-test--modules-dir
   (expand-file-name "modules" tilde-test--emacs-dir))
 
+;; `environments.el' and `typescript.el' both `(require 'proj-context)'
+;; so the shared resolver is visible under `load-path'. Adding the
+;; modules dir here (once) means individual tests do not need to know
+;; the resolver exists.
+(add-to-list 'load-path tilde-test--modules-dir)
+
 (defun tilde-test--load-module (name)
   "Load module NAME from the tracked emacs.d without going through init.el."
   (load (expand-file-name (concat name ".el") tilde-test--modules-dir)
@@ -113,7 +119,7 @@
 (defmacro tilde-test--with-temp-tree (root &rest body)
   "Bind ROOT to a fresh temp directory, evaluate BODY, delete after."
   (declare (indent 1) (debug (symbolp body)))
-  `(let ((,root (make-temp-file "tilde-emacs-test-" t)))
+  `(let ((,root (file-truename (make-temp-file "tilde-emacs-test-" t))))
      (unwind-protect
          (progn ,@body)
        (when (file-directory-p ,root)

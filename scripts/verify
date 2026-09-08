@@ -67,7 +67,7 @@ def typecheck():
 def test():
     require("fish", "jq", "tmux", "emacs", "nvim")
     run(sys.executable, "-m", "unittest", "discover", "-s", "scripts/tests", "-v")
-    for suite in ("emacs-config.el", "emacs-workflow.el"):
+    for suite in ("emacs-config.el", "emacs-workflow.el", "emacs-proj-context.el"):
         with tempfile.TemporaryDirectory(prefix="tilde-ert-") as home:
             run("emacs", "-Q", "--batch", "-l", "scripts/tests/" + suite,
                 "-f", "ert-run-tests-batch-and-exit",
@@ -87,6 +87,11 @@ def test():
 def smoke():
     require("emacs")
     run("emacs", "-Q", "--batch", "-l", "scripts/tests/emacs-smoke.el")
+    # Apheleia dispatch integration smoke. The suite itself prints SKIP
+    # and exits 0 when the package is missing, so this stays offline-
+    # safe on a fresh machine and only exercises the real dispatch
+    # entry point when the developer has apheleia installed.
+    run("emacs", "-Q", "--batch", "-l", "scripts/tests/emacs-apheleia-smoke.el")
 
 
 def main():

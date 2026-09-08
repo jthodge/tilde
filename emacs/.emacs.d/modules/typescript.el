@@ -23,20 +23,20 @@
 ;;     when non-nil, lsp-mode resolves the project's own tsserver
 ;;     via `node -e require.resolve("typescript")'.
 
+(require 'proj-context)
+
 (defun my/typescript-project-server ()
   "Return the project-local typescript-language-server, or nil.
-Looks under node_modules/.bin from the current file's directory
-upward. Never contacts the network."
+Delegates to `my/proj-find-node-bin' so the search starts at the
+buffer's own directory, is bounded by the VC root, and walks past
+a nested workspace whose `node_modules/' omits the server -- a
+hoisted root binary is still reachable. Never contacts the network."
   (when buffer-file-name
-    (let ((dir (locate-dominating-file
-                buffer-file-name
-                (lambda (d)
-                  (file-executable-p
-                   (expand-file-name
-                    "node_modules/.bin/typescript-language-server" d))))))
-      (when dir
-        (expand-file-name
-         "node_modules/.bin/typescript-language-server" dir)))))
+    (let* ((ctx (my/proj-context buffer-file-name))
+           (vcs (plist-get ctx :vcs-root))
+           (start (file-name-directory (expand-file-name buffer-file-name))))
+      (my/proj-find-node-bin start "typescript-language-server"
+                             (or vcs "/")))))
 
 (defun my/typescript-configure-server ()
   "Point lsp-mode at the best available typescript-language-server.

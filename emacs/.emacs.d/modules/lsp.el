@@ -215,9 +215,10 @@ touch the global completion setup."
                                            :upgrade_dependency t
                                            :vendor t))))
 
-  ;; Configure Go imports and formatting hooks
-  (defun lsp-go-install-save-hooks ()
-    (add-hook 'before-save-hook #'lsp-format-buffer t t)
-    (add-hook 'before-save-hook #'lsp-organize-imports t t))
-
-  (add-hook 'go-mode-hook #'lsp-go-install-save-hooks))
+  ;; NOTE: Go save-time formatting and import organisation are owned
+  ;; by Apheleia in `modules/development.el' (`my/go-format' ->
+  ;; goimports when available, else gofmt). We deliberately do NOT
+  ;; add `lsp-format-buffer' or `lsp-organize-imports' to
+  ;; `before-save-hook' -- two owners racing on save leads to lost
+  ;; edits and duplicated diffs.
+  )

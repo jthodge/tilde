@@ -23,6 +23,7 @@
 (dolist (module '("bootstrap"
                   "packages"
                   "environment"
+                  "proj-context"
                   "interface"
                   "lsp"
                   "treesitter"

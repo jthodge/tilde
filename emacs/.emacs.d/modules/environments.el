@@ -22,6 +22,7 @@
 
 (require 'project)
 (require 'seq)
+(require 'proj-context)
 
 (defvar-local my/venv--snapshot nil
   "Buffer-local snapshot of pre-activation Python environment state.
@@ -93,9 +94,19 @@ A -> B does not accumulate PATH entries."
     (message "Activated Python venv at %s (using %s)" venv-path python-path)))
 
 (defun my/venv--project-root-or-nil ()
-  "Return current project root or nil, without ever prompting."
-  (when-let* ((proj (project-current nil)))
-    (project-root proj)))
+  "Return the nearest Python project root for the current buffer, or nil.
+Uses `my/proj-context' so a nested Python subproject picks up its
+own `.venv' instead of always resolving to the outermost VC root.
+When the buffer either has no file or is not a Python file, the
+helper falls back to the outermost project root (never prompts),
+preserving the pre-existing behavior for scratch buffers, shell
+buffers, and hook-driven activation."
+  (let* ((ctx (my/proj-context buffer-file-name))
+         (root (and (eq (plist-get ctx :language) :python)
+                    (plist-get ctx :root))))
+    (or root
+        (when-let* ((proj (project-current nil)))
+          (project-root proj)))))
 
 (defun uv-activate-project-buffer ()
   "Activate the project .venv for the current buffer if one exists.
