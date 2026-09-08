@@ -40,9 +40,21 @@ if [ "${TILDE_AUTO_VENV:-1}" != 0 ] && [ -z "$VIRTUAL_ENV" ] && [ -f "$HOME/.ven
     source "$HOME/.venv/$UV_DEFAULT_VENV/bin/activate"
 fi
 
-# activate — deactivate any current venv, then source the target.
+# activate — validate the target *before* deactivating anything, so a
+# typo or a missing venv path does not leave the shell without its
+# previously-active environment. `deactivate` runs only after the new
+# activation script has been confirmed readable.
 activate() {
+    if [ "$#" -ne 1 ] || [ -z "$1" ]; then
+        print -u2 "activate: usage: activate <venv-path>"
+        return 2
+    fi
+    if [ ! -f "$1/bin/activate" ] || [ ! -r "$1/bin/activate" ]; then
+        print -u2 "activate: no activation script at $1/bin/activate"
+        return 1
+    fi
     [ -n "$VIRTUAL_ENV" ] && deactivate
+    # shellcheck disable=SC1091
     source "$1/bin/activate"
 }
 

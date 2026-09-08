@@ -73,6 +73,14 @@ def test():
                 "-f", "ert-run-tests-batch-and-exit",
                 environment={"HOME": home, "XDG_CONFIG_HOME": home + "/.config",
                              "XDG_CACHE_HOME": home + "/.cache"})
+    # Fresh-HOME smoke: loads init.el with no installed packages and
+    # opens Python/Elisp/Go/TS source buffers. Mocks package refresh /
+    # install and URL retrieval; does NOT stub yas-minor-mode or
+    # lsp-deferred - the language modules must guard those calls.
+    with tempfile.TemporaryDirectory(prefix="tilde-fresh-smoke-") as home:
+        run("emacs", "-Q", "--batch", "-l", "scripts/tests/emacs-fresh-smoke.el",
+            environment={"HOME": home, "XDG_CONFIG_HOME": home + "/.config",
+                         "XDG_CACHE_HOME": home + "/.cache"})
     run("nvim", "--headless", "--clean", "-l", "scripts/tests/nvim.lua")
 
 

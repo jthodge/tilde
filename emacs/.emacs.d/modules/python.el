@@ -19,8 +19,13 @@ can still call `uv-activate' manually for the $HOME fallback."
     (uv-activate-project-buffer)))
 
 (defun my/setup-python-development ()
-  "Configure Python development environment for current buffer."
-  (yas-minor-mode 1)
+  "Configure Python development environment for current buffer.
+
+Every optional dependency is guarded so opening a .py file in a
+fresh Emacs without yasnippet, lsp-mode, or dap-mode installed
+still produces a working buffer."
+  (when (fboundp 'yas-minor-mode)
+    (yas-minor-mode 1))
   (when (package-installed-p 'flycheck)
     (require 'flycheck nil t))
 
@@ -37,10 +42,13 @@ can still call `uv-activate' manually for the $HOME fallback."
 
   ;; Start LSP. lsp-pyright is optional; if the package is not
   ;; installed we let plain lsp-mode try whatever Python client is
-  ;; registered rather than crashing on `require'.
+  ;; registered rather than crashing on `require'. `lsp-deferred'
+  ;; itself is guarded so opening a .py file works even when the
+  ;; lsp-mode package is missing.
   (when (package-installed-p 'lsp-pyright)
     (require 'lsp-pyright nil t))
-  (lsp-deferred)
+  (when (fboundp 'lsp-deferred)
+    (lsp-deferred))
 
   ;; Optional debugger; keep the whole block guarded so a missing
   ;; dap-mode does not break Python editing.

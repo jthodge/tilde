@@ -262,18 +262,57 @@ registration without an installer call, no startup package refresh).
 Full real-server validation still needs a live Emacs and a real
 project. This is disclosed here on purpose.
 
-A separate full-init smoke check uses the installed packages with a temporary
-HOME, Custom file, and cache. It rejects package installs and URL retrieval:
+Two full-init smoke checks are available: installed packages via `make smoke`,
+and missing packages via `make test`.
 
-```sh
-emacs -Q --batch -l scripts/tests/emacs-smoke.el
-```
+1. **Installed-packages smoke.** Uses the developer's real MELPA cache
+   under a temporary HOME, Custom file, and eln-cache. Rejects package
+   installs and URL retrieval. Confirms the tracked configuration still
+   loads with the packages that are actually present on this machine.
 
-This check loads the real configuration but does not open projects or launch
-servers. Customize writes go to local `custom.el`; backup and autosave files
-go to ignored state directories. Autosave and backups remain enabled.
-After installing packages or grammars explicitly, restart Emacs to apply all
-conditional hooks and mode mappings.
+   ```sh
+   emacs -Q --batch -l scripts/tests/emacs-smoke.el
+   ```
+
+2. **Fresh-HOME smoke.** Points `package-user-dir` at an empty temporary
+   directory, so no third-party package is installed. Loads `init.el`
+   verbatim and then opens sample `.py`, `.el`, `.go`, `.ts`, and `.tsx`
+   buffers. The mocks block `package-refresh-contents`,
+   `package-install`, and `url-retrieve`; they deliberately do **not**
+   stub `yas-minor-mode` or `lsp-deferred`. The language modules must
+   guard those calls with `fboundp` themselves, and this test is what
+   catches the regression if they stop.
+
+   ```sh
+   emacs -Q --batch -l scripts/tests/emacs-fresh-smoke.el
+   ```
+
+Neither check opens projects, launches servers, or contacts the network.
+Customize writes go to a local `custom.el` inside the temporary HOME;
+backup and autosave files go to ignored state directories. Autosave and
+backups remain enabled. After installing packages or grammars
+explicitly, restart Emacs to apply all conditional hooks and mode
+mappings.
+
+### Missing-dependency fallback
+
+Each language module (`python.el`, `typescript.el`, `go.el`, `elisp.el`)
+guards every optional dependency at call time:
+
+- `yas-minor-mode` and `lsp-deferred` are wrapped in `(when (fboundp ...))`.
+- `dap-mode`, `flycheck`, `lsp-pyright`, and other packages already
+  used `package-installed-p` guards; those stay.
+- `.go` maps to `go-mode` when its function or autoload is available,
+  and to `prog-mode` otherwise. A `.go` file still opens without
+  the `go-mode` package installed.
+- `.ts` and `.tsx` fall through to their tree-sitter mode when the
+  grammar is available, then to `typescript-mode` if that legacy
+  package is installed, and finally to `prog-mode`. This is set from
+  `modules/typescript.el` **after** `treesitter.el` runs, so a real
+  grammar always wins.
+
+These guards are exercised by the fresh-HOME smoke test; regressing them
+surfaces as a failure in `make test`.
 
 ## Mechanical extraction record
 

@@ -4,9 +4,13 @@
 ;;; ================================================================
 
 (defun my/setup-elisp-development ()
-  "Configure Elisp development environment for current buffer."
-  ;; Enable minor modes
-  (yas-minor-mode 1)
+  "Configure Elisp development environment for current buffer.
+
+`yas-minor-mode' is guarded so a fresh Emacs without yasnippet
+still opens .el files."
+  ;; Enable minor modes when their package is present.
+  (when (fboundp 'yas-minor-mode)
+    (yas-minor-mode 1))
 
   ;; Enable linting with flycheck and package-lint
   (when (package-installed-p 'flycheck)

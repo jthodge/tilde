@@ -13,6 +13,8 @@ export VOLTA_FEATURE_PNPM=1
 # Python
 
 ## uv
-export PATH="/Users/jth/.local/bin:$PATH"
+export PATH="${HOME}/.local/bin:$PATH"
 
-. "$HOME/.cargo/env"
+# Rust — cargo env is optional. Fresh checkouts without rustup installed
+# would previously fail login with `no such file or directory`.
+[ -r "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
