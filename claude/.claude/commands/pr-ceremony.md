@@ -15,7 +15,7 @@ Run the same high-rigor, **one-PR-at-a-time** review → reconcile → fix → a
 - **repo** — e.g. `campus-ai/prim` (omit → infer from the cwd's `gh` remote, `gh repo view --json nameWithOwner`).
 - **pr-range** — `53-61`, `53,55,58`, or `53-61 except 59`. Resolve to concrete PR numbers and order them by **dependency** (a PR's base branch is processed before the PR). `gh pr view N --json baseRefName,headRefName` builds the chain.
 - **--onto `<branch>`** — the merge target (default `main`).
-- **--auto** — autonomous mode: an **adversarial-review CONFIRM replaces the manual approval gate**. Default is approval-gated (present each PR; merge ONLY on explicit human APPROVE). **Running this under `/goal` implies `--auto`** — the goal's Stop-hook is what drives "proceed to the next PR," and the adversarial fleet is the approval authority.
+- **--auto** — allow review and verification to continue without intermediate prompts. This flag does not authorize publishing, force-pushing, or merging. Running under `/goal` does not grant additional permission. Obtain explicit user authorization for each publishing or merge operation, or for an explicitly bounded batch.
 - **--contract `<ref>`** — the authoritative contract the PRs must conform to: a path, a merged PR/range, or a spec file (default: **the merge target branch itself is ground truth** — its current code is the contract downstream PRs were likely authored against an older version of).
 
 If repo or range is genuinely ambiguous, ask once. Otherwise proceed. Set up a reviews dir: `<repo-root>/.context/pr-reviews/` (gitignored cross-agent state); write one `pr-NN-<slug>.md` per PR.
@@ -42,13 +42,13 @@ For PR **N**, in a dedicated worktree (city-named under `…/workspaces/<project
 
 5. **Adversarial-review gate.** Spawn an INDEPENDENT skeptic panel (perspective-diverse lenses — e.g. contract-conformance, regression/cold-path, security/AX, scrub) to confirm: every finding resolved, no regression or reintroduced-class, no NEW drift, scrub clean, trail green. A finding the gate raises is fixed and re-confirmed (bounded ~4 attempts before escalating to the human). This panel is the verification of MY redo, not the author's original — it has caught a real defect nearly every PR; never skip it.
 
-6. **Tree-identity squash → one clean commit.** Capture the tree (`git add -A && git write-tree`), `git reset --mixed <target>`, re-stage, commit with a **pedagogical, self-contained** message (a lesson, not a diff/journey/milestone log), and assert `HEAD^{tree}` equals the captured tree byte-for-byte. Squash-merge convention: one commit per PR, `feat(...)`/`fix(...)` subject. Scrub the PR **title + body** too. (Local commits may need `--no-gpg-sign` if the signing agent fails in-env; the GitHub squash-merge re-signs the canonical commit.)
+6. **Tree-identity squash → one clean commit.** Capture the tree (`git add -A && git write-tree`), `git reset --mixed <target>`, re-stage, commit with a **pedagogical, self-contained** message (a lesson, not a diff/journey/milestone log), and assert `HEAD^{tree}` equals the captured tree byte-for-byte. Squash-merge convention: one commit per PR, `feat(...)`/`fix(...)` subject. Scrub the PR **title + body** too. Sign every local commit through the 1Password SSH agent. If signing fails, stop and report the failure. Never disable signing; a later GitHub signature is not a substitute.
 
-7. **CI.** `git push --force-with-lease origin <branch>:<branch>`. Then **retarget the base**: `gh pr edit N --base <target>`, and **`gh pr close N; gh pr reopen N`** to fire a fresh `pull_request` event (stacked PRs whose base was a parent branch won't trigger CI otherwise). Wait for green (poll in the background).
+7. **CI.** Confirm the remote and branch, and obtain explicit push authorization before publishing. A rewritten branch also requires explicit force-push authorization before `git push --force-with-lease origin <branch>:<branch>`. Do not infer either permission from this command or its flags. Before retargeting, closing, or reopening a PR, confirm those remote changes are within the authorized scope. Wait for the required CI checks; do not assume a particular event sequence guarantees a new run.
 
 8. **Merge gate.**
    - **Default (approval-gated):** present a verdict-first summary (what landed, what the fleet found + fixed) and merge **only on explicit human APPROVE**.
-   - **`--auto` / under `/goal`:** the adversarial-review CONFIRM (step 5) + green CI IS the approval — merge.
+   - **`--auto` / under `/goal`:** review confirmation and green CI establish readiness, not permission. Merge only with explicit user authorization covering this PR.
    - Merge: `gh pr merge N --squash --subject "<clean subject>" --body-file <clean body>`.
 
 9. **Advance.** Rebase the next PR onto the NEW target sha and repeat. Update the per-PR review file; at the end, refresh the ceremony memory.
@@ -57,6 +57,8 @@ For PR **N**, in a dedicated worktree (city-named under `…/workspaces/<project
 
 - **Never** add AI as author/contributor; no `Co-Authored-By`, "Generated with", or 🤖, in commits, PR bodies, or comments. ("Claude Code" as a *product* reference is allowed.)
 - Never commit without explicit authorization + a Verification Trail (lint, typecheck, test, diff).
+- Stop on signing failure. Never use `--no-gpg-sign`.
+- Pushes, force-pushes, default-branch publication, and merges require explicit user authorization. These are separate permissions.
 - Squash-merge, one commit per PR. Tree identity (byte-for-byte `git diff`) is the ground truth that a narrative reconciliation is functionally correct.
 - Final PR branches use `feat/` `fix/` `chore/` prefixes; never a `-clean` suffix.
 - AX: STDOUT machine-readable, STDERR human; verdict-first comms.
