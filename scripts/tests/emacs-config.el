@@ -371,5 +371,22 @@
       (should (equal before process-environment))
       (should-not my/venv--snapshot))))
 
+(ert-deftest tilde/typescript-default-mapping-needs-a-usable-grammar ()
+  (tilde-test--install-stubs)
+  (unwind-protect
+      (cl-letf (((symbol-function 'treesit-available-p) (lambda () nil)))
+        (let ((auto-mode-alist '(("\\.ts\\'" . typescript-ts-mode)
+                                 ("\\.tsx\\'" . tsx-ts-mode))))
+          (tilde-test--load-module "typescript")
+          (dolist (name '("sample.ts" "sample.tsx"))
+            (with-temp-buffer
+              (setq buffer-file-name name)
+              (set-auto-mode)
+              (should (derived-mode-p 'prog-mode))))
+          (setf (alist-get "\\.ts\\'" auto-mode-alist nil nil #'equal) 'text-mode)
+          (my/typescript--register-fallback "\\.ts\\'" 'typescript)
+          (should (eq (cdr (assoc "\\.ts\\'" auto-mode-alist)) 'text-mode))))
+    (tilde-test--remove-stubs)))
+
 (provide 'emacs-config)
 ;;; emacs-config.el ends here

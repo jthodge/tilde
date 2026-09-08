@@ -91,24 +91,24 @@ without yasnippet or lsp-mode still opens .ts/.tsx buffers."
 ;; would fall through to `fundamental-mode' and never trigger any of
 ;; the hooks above. Register a usable fallback: prefer the classic
 ;; `typescript-mode' when the third-party package is installed,
-;; otherwise `prog-mode' so the buffer at least has comment / indent
-;; primitives. Never override an entry that treesitter (or the user)
-;; already installed.
+;; otherwise `prog-mode' for basic editing. Replace an unusable built-in
+;; tree-sitter mapping, but preserve unrelated custom mode choices.
 
 (defun my/typescript--register-fallback (pattern grammar)
-  "Ensure PATTERN is bound in `auto-mode-alist' when GRAMMAR is missing.
-Does nothing if PATTERN is already mapped."
-  (unless (assoc pattern auto-mode-alist)
-    (let ((mode (cond
-                 ((and (fboundp 'treesit-language-available-p)
-                       (treesit-language-available-p grammar)
-                       (fboundp (if (eq grammar 'tsx)
-                                    'tsx-ts-mode
-                                  'typescript-ts-mode)))
-                  (if (eq grammar 'tsx) 'tsx-ts-mode 'typescript-ts-mode))
-                 ((fboundp 'typescript-mode) 'typescript-mode)
-                 (t 'prog-mode))))
-      (add-to-list 'auto-mode-alist (cons pattern mode)))))
+  "Map PATTERN to a usable mode while preserving unrelated custom mappings.
+An existing built-in tree-sitter mapping is not usable without its grammar."
+  (let* ((entry (assoc pattern auto-mode-alist))
+         (ts-mode (if (eq grammar 'tsx) 'tsx-ts-mode 'typescript-ts-mode))
+         (ready (and (fboundp 'treesit-available-p) (treesit-available-p)
+                     (fboundp 'treesit-language-available-p)
+                     (treesit-language-available-p grammar)
+                     (fboundp ts-mode))))
+    (when (or (null entry)
+              (and (not ready) (memq (cdr entry) '(typescript-ts-mode tsx-ts-mode))))
+      (setf (alist-get pattern auto-mode-alist nil nil #'equal)
+            (cond (ready ts-mode)
+                  ((fboundp 'typescript-mode) 'typescript-mode)
+                  (t 'prog-mode))))))
 
 (my/typescript--register-fallback "\\.ts\\'" 'typescript)
 (my/typescript--register-fallback "\\.tsx\\'" 'tsx)
