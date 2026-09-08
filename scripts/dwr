@@ -1,100 +1,247 @@
 #!/usr/bin/env bash
 
 # Delete workflow runs - dwr
-
-# Given "owner/repo" name, e.g. "$OWNER/$REPO", retrieve workflow runs
-# for repo and present them list. Selected runs will be deleted.
-# Consumes GitHub API.
-
-# Requires:
-# - gh
-# - jq
+#
+# Given "owner/repo", fetch workflow runs via the GitHub API, present them
+# interactively via fzf, and delete the selected runs.
+#
+# Safety model:
+#   - --help is handled before any prompt or network call.
+#   - --dry-run performs zero mutation API calls (no DELETE).
+#   - --yes (-y) opts into non-interactive deletion; without it, a typed
+#     "yes" is read from /dev/tty. If no tty is available and --yes was
+#     not passed, the script refuses.
+#   - Fetch/parse/select run to completion before any mutation; upstream
+#     failure cannot leave a partial deletion.
+#   - A workflow run whose "conclusion" is null (still queued/in progress)
+#     falls back to "status" instead of blowing up on jq.
+#
+# Requires: gh, jq, fzf.
 
 set -o errexit
 set -o pipefail
 
-if [[ -z "$1" ]]; then
-  read -p "Enter owner value: " owner
-  read -p "Enter repo value: " repo_name
-  declare repo="$owner/$repo_name"
-else
-  declare repo="$1"
-fi
+PROG="${0##*/}"
 
-jqscript() {
+DRY_RUN=0
+ASSUME_YES=0
+REPO=""
 
-    cat <<EOF
-      def symbol:
-        sub("skipped"; "SKIP") |
-        sub("success"; "GOOD") |
-        sub("failure"; "FAIL");
-
-      def tz:
-        gsub("[TZ]"; " ");
-
-
-      .workflow_runs[]
-        | [
-            (.conclusion | symbol),
-            (.created_at | tz),
-            .id,
-            .event,
-            .name
-          ]
-        | @tsv
-EOF
-
-}
-
-selectruns() {
-
-  gh api --paginate "/repos/$repo/actions/runs" \
-    | jq -r -f <(jqscript) \
-    | fzf --multi
-
-}
-
-deleterun() {
-
-  local run id result
-  run=$1
-  id="$(cut -f 3 <<< "$run")"
-  gh api -X DELETE "/repos/$repo/actions/runs/$id"
-  [[ $? = 0 ]] && result="OK!" || result="BAD"
-  printf "%s\t%s\n" "$result" "$run"
-
-}
-
-deleteruns() {
-
-  local id
-  while read -r run; do
-    deleterun "$run"
-    sleep 0.25
-  done
-
-}
+log() { printf '%s\n' "$*" >&2; }
+err() { printf '%s: error: %s\n' "$PROG" "$*" >&2; }
 
 usage() {
-  echo "Usage: $0 [owner/repo]"
-  echo "  owner/repo: Repository (if not provided, you'll be prompted for owner and repo)"
-  echo ""
-  echo "Examples:"
-  echo "  $0                    # Prompts for owner and repo"
-  echo "  $0 myuser/myrepo      # All workflow runs for specific repo"
-  echo ""
-  echo "Use fzf to search and filter workflow runs interactively"
+  cat <<EOF
+Usage: $PROG [options] [owner/repo]
+
+Interactively select GitHub workflow runs via fzf, then delete them.
+
+Options:
+  -h, --help       Show this help and exit.
+      --dry-run    List what would be deleted; make no mutation API calls.
+  -y, --yes        Do not prompt for confirmation before deleting.
+
+Arguments:
+  owner/repo       Target repository. If omitted and stdin is a tty, you
+                   will be prompted.
+
+Exit codes:
+  0  success (including "nothing selected")
+  1  runtime failure (list, parse, or delete failed)
+  2  usage error (bad flag, bad repo, missing repo without tty)
+  3  aborted (confirmation declined or no tty for confirmation)
+127  missing dependency
+
+Output:
+  Machine-readable deletion results go to stdout as TAB-separated lines:
+    <RESULT>\t<id>\t<original selection line>
+  where RESULT is OK, SKIP (dry-run), or BAD. Human narration goes to stderr.
+EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help) usage; exit 0 ;;
+      --dry-run) DRY_RUN=1; shift ;;
+      -y|--yes)  ASSUME_YES=1; shift ;;
+      --)        shift; break ;;
+      -*)        err "unknown option: $1"; usage >&2; exit 2 ;;
+      *)
+        if [[ -z "$REPO" ]]; then
+          REPO="$1"; shift
+        else
+          err "unexpected argument: $1"; exit 2
+        fi
+        ;;
+    esac
+  done
+  if [[ $# -gt 0 ]]; then
+    [[ $# -eq 1 && -z "$REPO" ]] || { err 'unexpected arguments'; exit 2; }
+    REPO="$1"
+  fi
+}
+
+check_deps() {
+  local dep missing=0
+  for dep in gh jq fzf; do
+    if ! command -v "$dep" >/dev/null 2>&1; then
+      err "missing dependency: $dep"
+      missing=1
+    fi
+  done
+  [[ $missing -eq 0 ]] || exit 127
+}
+
+resolve_repo() {
+  if [[ -z "$REPO" ]]; then
+    if [[ -t 0 ]]; then
+      local owner name
+      printf 'Enter owner: ' >&2
+      IFS= read -r owner || { err "no repo provided"; exit 2; }
+      printf 'Enter repo: ' >&2
+      IFS= read -r name || { err "no repo provided"; exit 2; }
+      REPO="$owner/$name"
+    else
+      err "repo required (pass owner/repo)"
+      exit 2
+    fi
+  fi
+  if ! [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    err "invalid repo (expected owner/repo): $REPO"
+    exit 2
+  fi
+}
+
+jqscript() {
+  cat <<'EOF'
+    def symbol:
+      sub("skipped"; "SKIP") |
+      sub("success"; "GOOD") |
+      sub("failure"; "FAIL") |
+      sub("cancelled"; "CANC") |
+      sub("in_progress"; "PROG") |
+      sub("queued"; "QUER") |
+      sub("pending"; "PEND");
+
+    def tz:
+      gsub("[TZ]"; " ");
+
+    .workflow_runs[]
+      | [
+          ((.conclusion // .status // "unknown") | symbol),
+          (.created_at | tz),
+          (.id | tostring),
+          (.event // ""),
+          (.name // "")
+        ]
+      | @tsv
+EOF
+}
+
+confirm() {
+  local count="$1"
+  if [[ $ASSUME_YES -eq 1 || $DRY_RUN -eq 1 ]]; then
+    return 0
+  fi
+  if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
+    err "no tty available for confirmation; re-run with --yes to proceed non-interactively"
+    exit 3
+  fi
+  local reply
+  printf 'About to delete %d workflow run(s) from %s. Type "yes" to proceed: ' \
+    "$count" "$REPO" >/dev/tty
+  IFS= read -r reply </dev/tty || { err "aborted"; exit 3; }
+  if [[ "$reply" != "yes" ]]; then
+    err "aborted"
+    exit 3
+  fi
+}
+
+delete_one() {
+  local line id
+  line="$1"
+  id="$(printf '%s' "$line" | cut -f 3)"
+  if ! [[ "$id" =~ ^[0-9]+$ ]]; then
+    printf 'BAD\t\t%s\n' "$line"
+    return 1
+  fi
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    printf 'SKIP\t%s\t%s\n' "$id" "$line"
+    return 0
+  fi
+
+  if gh api -X DELETE "/repos/$REPO/actions/runs/$id" >/dev/null 2>&1; then
+    printf 'OK\t%s\t%s\n' "$id" "$line"
+  else
+    printf 'BAD\t%s\t%s\n' "$id" "$line"
+    err "failed to delete workflow run $id"
+    return 1
+  fi
 }
 
 main() {
+  parse_args "$@"
+  check_deps
+  resolve_repo
 
-  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    usage
+  local raw parsed selection count line id failed=0
+
+  log "Fetching workflow runs for $REPO..."
+  if ! raw=$(gh api --paginate "/repos/$REPO/actions/runs" 2>/dev/null); then
+    err "failed to list workflow runs"
+    exit 1
+  fi
+
+  # Validate JSON before parsing. Some jq builds return 0 on parse errors
+  # unless -e is used; `jq -e type` reliably distinguishes invalid input.
+  if ! printf '%s' "$raw" | jq -e type >/dev/null 2>&1; then
+    err "failed to parse workflow runs (invalid JSON from gh)"
+    exit 1
+  fi
+  if ! parsed=$(printf '%s' "$raw" | jq -r -f <(jqscript) 2>/dev/null); then
+    err "failed to parse workflow runs"
+    exit 1
+  fi
+
+  if [[ -z "$parsed" ]]; then
+    log "no workflow runs found"
     exit 0
   fi
 
-  selectruns | deleteruns
+  if ! selection=$(printf '%s\n' "$parsed" | fzf --multi); then
+    log "no selection; nothing to delete"
+    exit 0
+  fi
+  if [[ -z "$selection" ]]; then
+    log "no selection; nothing to delete"
+    exit 0
+  fi
 
+  # Validate the complete selection before the first mutation.
+  while IFS= read -r line; do
+    id=$(printf '%s' "$line" | cut -f 3)
+    if ! [[ "$id" =~ ^[0-9]+$ ]] || ! grep -Fqx -- "$line" <<< "$parsed"; then
+      err 'invalid selection'; exit 1
+    fi
+  done <<< "$selection"
+  count=$(printf '%s\n' "$selection" | grep -c .)
+  printf 'Selected runs in %s:\n%s\n' "$REPO" "$selection" >&2
+  confirm "$count"
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log "dry-run: no API mutations will be performed"
+  fi
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    if ! delete_one "$line"; then failed=1; fi
+    if [[ $DRY_RUN -eq 0 ]]; then
+      sleep 0.25
+    fi
+  done <<< "$selection"
+  return "$failed"
 }
 
 main "$@"
