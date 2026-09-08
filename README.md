@@ -109,6 +109,8 @@ make smoke        # optional full-init Emacs check with installed packages
 See [verification scope and limitations](docs/verification.md),
 [shell startup](docs/shell-startup.md), [Emacs workflow](docs/emacs-workflow.md),
 and [terminal workflow](docs/terminal-workflow.md).
+[Adoption decisions and open checks](docs/adoption-decisions.md) records why
+Stow and the existing personal tools remain in place.
 
 ## GitHub SSH key registration
 
