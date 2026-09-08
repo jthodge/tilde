@@ -5,45 +5,31 @@ description: "Trigger native web search. Use when you need quick internet resear
 
 # Native Web Search
 
-Use this skill to run a **fast model with native web search enabled** and get a concise research summary with explicit full URLs.
+The `pi-web-access` package (installed via `npm:pi-web-access` in
+`pi/.pi/agent/settings.json`) registers `web_search`, `source_check`,
+`fetch_content`, and `get_search_content` directly as Pi tools. Use those
+tools; there is no wrapper script to run here.
 
-## Script
+## Which tool to call
 
-- `search.mjs`
-
-## Usage
-
-Run from this skill directory:
-
-```bash
-node search.mjs "<what to search>" --purpose "<why you need this>"
-```
-
-Examples:
-
-```bash
-node search.mjs "latest python release" --purpose "update dependency notes"
-node search.mjs "vite 7 breaking changes" --purpose "prepare migration checklist"
-```
-
-Optional flags:
-
-- `--provider openai-codex|anthropic`
-- `--model <model-id>`
-- `--timeout <ms>`
-- `--json`
-
-## Output expectations
-
-The script instructs the model to:
-- search the internet for the requested topic
-- provide a concise summary for the given purpose
-- include full canonical URLs (`https://...`) for each key finding
-- highlight disagreements between sources
+- `web_search` — one or more queries, optional provider filter, returns
+  synthesized answers with source URLs. Prefer `queries` (array, 2-4
+  varied angles) over a single `query` for research.
+- `source_check` — verify a specific claim; returns machine-readable
+  passage citations.
+- `fetch_content` — fetch a URL as readable markdown, or use
+  `mode: "answer"` with a `prompt` to answer strictly from a page.
+- `get_search_content` — retrieve stored slices from a previous
+  `web_search`, `source_check`, or `fetch_content` call via its
+  `responseId`.
 
 ## Notes
 
-- No extra npm install is required.
-- If module resolution fails, set `PI_AI_MODULE_PATH` to `@earendil-works/pi-ai`'s `dist/index.js` path.
-- If OAuth helper resolution fails, set `PI_AI_OAUTH_MODULE_PATH` to `@earendil-works/pi-ai`'s `dist/oauth.js` path.
-- For OAuth providers, the script can fall back to a still-valid cached `access` token from `~/.pi/agent/auth.json`.
+- Provider selection, credentials, and OAuth token handling are owned by
+  `pi-web-access`. There is no shell-side credential wrapper in this
+  repo. Do not fabricate one; if the package is misconfigured, update
+  its configuration through Pi settings.
+- If the package is not present in a checkout, install it explicitly:
+  `pi install npm:pi-web-access`. The custom skill script that used to
+  live here was removed on redundancy grounds; do not resurrect it
+  without a documented failure of the packaged tools.

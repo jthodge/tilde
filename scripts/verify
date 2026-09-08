@@ -65,8 +65,12 @@ def typecheck():
 
 
 def test():
-    require("fish", "jq", "tmux", "emacs", "nvim")
+    require("fish", "jq", "tmux", "emacs", "nvim", "node")
     run(sys.executable, "-m", "unittest", "discover", "-s", "scripts/tests", "-v")
+    # Run actual extension callbacks using Node's built-in TypeScript stripper.
+    # No installed Pi package or external transpiler is required.
+    for suite in ("test_plan_mode.mjs", "test_gates.mjs"):
+        run("node", "--test", "scripts/tests/pi-extensions/" + suite)
     for suite in ("emacs-config.el", "emacs-workflow.el", "emacs-proj-context.el"):
         with tempfile.TemporaryDirectory(prefix="tilde-ert-") as home:
             run("emacs", "-Q", "--batch", "-l", "scripts/tests/" + suite,

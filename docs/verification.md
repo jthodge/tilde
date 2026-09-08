@@ -46,7 +46,17 @@ Python and its possibly unsupported syntax.
   dependencies, malformed manifests, and Git/path inspection failures.
 - **Policy:** targeted text checks prevent known signing/publication conflicts.
   They do not prove that an agent will obey prose or that heuristic permission
-  guards are a sandbox.
+  guards are a sandbox. Extension boundaries and their documented limits are
+  spelled out in [agent-boundaries.md](agent-boundaries.md).
+- **Pi extensions:** `test_plan_mode.mjs` and `test_gates.mjs` load the real
+  extension sources with `node:module.stripTypeScriptTypes` and import the
+  stripped JavaScript via a data URL. Only `@earendil-works/pi-tui` is stubbed
+  at runtime; every other pi import is `import type` and is erased by the
+  built-in type stripper. Tests exercise the extensions through a minimal
+  in-memory `ExtensionAPI`. If the stripper is unavailable the harness exits
+  nonzero with a MISSING message, so the check cannot silently pass. Requires
+  Node 22.13+ on the 22.x line, or Node 24. CI selects Node 22 explicitly in
+  `.github/workflows/check.yml`; no Pi installation is needed.
 
 The GitHub Actions job runs `make verify` on macOS without Stow deployment,
 credentials, user data, or an editor-package bootstrap. Tool installation is

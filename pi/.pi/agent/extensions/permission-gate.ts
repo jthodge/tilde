@@ -1,8 +1,31 @@
 /**
  * Permission Gate Extension
  *
- * Prompts for confirmation before running potentially dangerous bash commands.
- * Patterns checked: rm -rf, sudo, chmod/chown 777
+ * A confirmation prompt on a small set of obviously destructive bash
+ * command shapes. Does not sandbox anything.
+ *
+ * Coverage (single hook, single tool):
+ *   - Hook: `tool_call`
+ *   - Tool: `bash` only
+ *   - Patterns: `rm -rf|-r|--recursive`, bare `sudo`, `chmod|chown` with `777`
+ *
+ * Out of scope:
+ *   - Any other tool (`edit`, `write`, `powershell`, custom shell tools,
+ *     extension tools that execute commands, MCP-backed tools)
+ *   - Sibling shells reached through `bash -c`, `sh -c`, `env`, backticks,
+ *     `$(...)`, subshells, aliases, functions, sourced scripts, cron,
+ *     launchd/systemd, ssh/mosh into remote hosts
+ *   - Shell operators and I/O redirection (`>`, `>>`, `|`, `&&`), pathname
+ *     glob expansion, and arbitrary interpreter payloads (python -c,
+ *     node -e, perl -e, awk 'BEGIN{...}')
+ *   - Package I/O (npm/yarn/pnpm/pip/brew/apt install|uninstall|update)
+ *   - Network egress (curl/wget/nc, git push/pull, ssh) and long-running
+ *     services
+ *
+ * The extension is a nudge, not a sandbox. Treat it as one prompt on a
+ * handful of common footguns. Do not rely on it to contain a hostile
+ * model or a novel command shape. For real containment, use OS-level
+ * mechanisms such as containers, seccomp, or sandbox-exec.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
