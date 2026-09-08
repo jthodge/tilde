@@ -70,3 +70,7 @@ ido.last
 /custom.el
 /backups/
 /auto-save/
+
+# Local persistent context (savehist, recentf).
+# Managed by modules/context.el; never tracked.
+/state/

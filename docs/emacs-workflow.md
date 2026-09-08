@@ -22,6 +22,9 @@ directory, so adding a file does not silently change startup behavior.
 - `typescript`, `python`, `go`, `elisp`: language-specific setup.
 - `workflow`: focused pilot for project, git, search, and test bindings
   (see "Workflow pilot" below).
+- `context`: built-in persistent context conveniences (savehist,
+  recentf, global-auto-revert) with local ignored state.
+  See "Persistent context" below.
 - `custom-settings`: durable Customize declarations (tracked).
 
 `init.el` sets `custom-file` to `~/.emacs.d/custom.el` early, then
@@ -217,6 +220,17 @@ in an exact pytest node ID. It refuses a non-test function. Go nearest
 checks the nearest preceding function declaration; it refuses helpers
 instead of accidentally selecting an earlier test, and uses `^TestX$`.
 
+### Project-scoped compilation buffers
+
+`my/workflow--run` binds `compilation-buffer-name-function` to a
+closure that returns `*compilation:<canonical-scope-root>*`, so
+running tests in project **A** does not overwrite the last output
+in project **B**, even when both repositories have the same basename. The scope root comes from `my/workflow--scope-root`
+-- the same helper every scope (project / file / nearest / rerun)
+uses -- so there is no new parallel project resolver. Nothing else
+about `compile` changes: mode, hook chain, and follow-error behavior
+are exactly what `compilation-mode` provides.
+
 ### Overriding the command
 
 Each scope has its own buffer-local override variable. There is no
@@ -336,6 +350,71 @@ before using Magit; Embark keys are only installed when its package exists.
 Restart Emacs after installation. Remove the workflow module from the loader
 to remove its keybindings; uninstalling packages alone leaves bound symbols.
 
+## Persistent context
+
+`modules/context.el` enables three built-in modes and qualifies project
+buffer names with canonical roots. State lives under `~/.emacs.d/state/`
+(gitignored). No new interactive command or terminal is introduced.
+
+| Mode | State file | Purpose |
+| --- | --- | --- |
+| `savehist-mode` | `state/history` | Persists minibuffer histories across sessions |
+| `recentf-mode` | `state/recentf`  | Tracks recently opened files |
+| `global-auto-revert-mode` | (none) | Re-reads unmodified file buffers when the file changes on disk |
+
+`savehist` excludes `kill-ring`, `register-alist`,
+`shell-command-history`, `command-history`, `read-expression-history`,
+and `eval-expression-history`. Other history can still contain private
+input: do not publish it. Files are restricted to `0600`, their directory
+to `0700`, and save modes explicitly retain those file permissions.
+
+`recentf-auto-cleanup` is pinned to `never`, suppressing startup
+cleanup probes in `recentf-cleanup` for
+stale Tramp entries. Runtime tracking still admits remote files
+via the default `recentf-keep-default-predicate`, which only
+probes when a Tramp connection is already open.
+
+`global-auto-revert-mode` runs with `auto-revert-remote-files` and
+`global-auto-revert-non-file-buffers` both nil. Modified buffers
+are preserved by the built-in `buffer-stale--default-function`,
+which returns nil for a modified buffer regardless of noconfirm --
+auto-revert never discards unsaved edits.
+
+### Commands and keys
+
+The module does **not** define a new command or a new prefix map.
+Every navigation entry point is the built-in:
+
+| Key | Command | Notes |
+| --- | --- | --- |
+| `C-c p b` | `project-switch-to-buffer` | Via `project-prefix-map` |
+| `C-c p s` | `project-shell`           | Reuses one shell per project root |
+| `C-c p c` | `project-compile`         | Built-in compile scoped to the project |
+| `C-c r`   | `recentf-open`            | Bound only if the global slot is unbound |
+
+`project-shell` uses `project-prefixed-buffer-name`. Its basename-only
+default collides for two repositories named `app`; a small named filter
+adds the canonical root while retaining the project label. The built-in
+shell implementation still handles reuse and window display. `project-compile`
+uses the same qualified naming. Reloading does not stack the filter.
+
+These project commands use project.el's root; test commands use the nearest
+language scope described above. Return to a source buffer with `C-c p b`
+or `C-x b`; use `C-c r` (or `M-x recentf-open`) after restarting Emacs.
+
+### Limitation
+
+The ERT suite (`scripts/tests/emacs-context.el`) exercises the
+**mechanics**: history save/load round-trips with the excluded
+variables verified as never-written; recentf round-trips; modified
+vs unmodified external-file refresh; idempotent module reload;
+project-scoped compilation buffer naming; and reuse-per-root of
+`project-shell` with only the process boundary
+(`make-comint-in-buffer` and `comint-check-proc`) mocked. The
+tests do **not** measure a reduction in this user's day-to-day
+context switching or benchmark end-to-end workflow. That is a
+human-observable outcome, not a batch-testable one.
+
 ## Tests and limits
 
 Static Python tests (already existed):
@@ -352,6 +431,8 @@ emacs -Q --batch -l scripts/tests/emacs-config.el \
 emacs -Q --batch -l scripts/tests/emacs-workflow.el \
       -f ert-run-tests-batch-and-exit
 emacs -Q --batch -l scripts/tests/emacs-proj-context.el \
+      -f ert-run-tests-batch-and-exit
+emacs -Q --batch -l scripts/tests/emacs-context.el \
       -f ert-run-tests-batch-and-exit
 ```
 

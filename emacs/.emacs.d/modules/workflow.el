@@ -22,6 +22,7 @@
 ;; while the entry was stored under an outer root.
 
 (require 'project)
+(require 'compile)
 (require 'seq)
 (require 'subr-x)
 (require 'proj-context)
@@ -226,9 +227,18 @@ FILE is passed through `shell-quote-argument'."
       "Nearest JS/TS test is not supported; use file tests or set `my/workflow-nearest-test-command'"))
     (_ (user-error "Unsupported project type at %s" root))))
 
+(defun my/workflow--compile-buffer-name (root)
+  "Return a distinct compilation buffer name for canonical project ROOT.
+Use the full path: separate repositories can have the same basename."
+  (format "*compilation:%s*"
+          (abbreviate-file-name (directory-file-name (my/proj--norm root)))))
+
 (defun my/workflow--run (cmd root)
   (puthash root cmd my/workflow--last-test)
-  (let ((default-directory root))
+  (let* ((default-directory root)
+         (target-name (my/workflow--compile-buffer-name root))
+         (compilation-buffer-name-function
+          (lambda (_mode) target-name)))
     (compile cmd)))
 
 ;;;###autoload

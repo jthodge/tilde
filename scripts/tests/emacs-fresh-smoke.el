@@ -90,4 +90,10 @@ obvious in the batch log."
                   (when (buffer-live-p buf)
                     (kill-buffer buf)))))))
         (princ "PASS: fresh HOME init opens Python/Elisp/Go/TypeScript/TSX sources without installed packages\n"))
+    ;; Shut down modes that install `kill-emacs-hook' writers so the
+    ;; temp HOME can vanish without a save-time warning at exit.
+    (when (bound-and-true-p savehist-mode) (savehist-mode -1))
+    (when (bound-and-true-p recentf-mode) (recentf-mode -1))
+    (when (bound-and-true-p global-auto-revert-mode)
+      (global-auto-revert-mode -1))
     (delete-directory home t)))
