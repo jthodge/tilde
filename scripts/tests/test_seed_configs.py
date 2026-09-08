@@ -10,6 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 loader = importlib.machinery.SourceFileLoader("seed_configs", str(ROOT / "scripts/seed-configs"))
 spec = importlib.util.spec_from_loader(loader.name, loader)
+assert spec is not None
 module = importlib.util.module_from_spec(spec)
 loader.exec_module(module)
 

@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Run explicit, offline configuration checks. Reports are JSON on stdout."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def run(*args, environment=None):
+    print("+ " + " ".join(args), file=sys.stderr)
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    env.update(environment or {})
+    subprocess.run(args, cwd=str(REPO), check=True, stdout=sys.stderr, stderr=sys.stderr,
+                   env=env)
+
+
+def require(*tools):
+    missing = [tool for tool in tools if not shutil.which(tool)]
+    if missing:
+        raise RuntimeError("Missing verification tools: " + ", ".join(missing))
+
+
+def tracked_files():
+    data = subprocess.check_output(["git", "ls-files", "-z"], cwd=str(REPO))
+    return [REPO / name for name in data.decode().split("\0") if name]
+
+
+def lint():
+    require("git", "bash", "zsh", "fish", "shellcheck", "emacs", "nvim", "ruby")
+    for path in tracked_files():
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = str(path.relative_to(REPO))
+        if path.suffix == ".json":
+            json.loads(path.read_text())
+        elif path.suffix in (".yml", ".yaml"):
+            run("ruby", "-e", "require 'yaml'; YAML.load_file(ARGV[0])", str(path))
+        elif path.suffix == ".py" or relative in ("scripts/doctor", "scripts/seed-configs", "scripts/verify"):
+            compile(path.read_text(), str(path), "exec")
+        elif path.suffix == ".fish":
+            run("fish", "--no-config", "--no-execute", str(path))
+        elif relative.startswith("zsh/"):
+            run("zsh", "-n", str(path))
+        elif relative == "bash/.bash_profile" or path.read_bytes().startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash")):
+            run("bash", "-n", str(path))
+    run("shellcheck", "--severity=warning", "scripts/check", "scripts/ddr", "scripts/dwr",
+        "scripts/setup-tools", "bin/.local/bin/uv-python-simlink")
+    run("ruby", "-c", "Brewfile")
+    run("emacs", "-Q", "--batch", "-l", "scripts/tests/emacs-syntax.el")
+    run("nvim", "--headless", "--clean", "-l", "scripts/tests/nvim.lua")
+    run("git", "diff", "--check")
+    run("git", "diff", "--cached", "--check")
+
+
+def typecheck():
+    require("pyright")
+    run("pyright", "--pythonversion", "3.9", "--level", "error",
+        "scripts/doctor", "scripts/seed-configs", "scripts/verify", "scripts/tests")
+
+
+def test():
+    require("fish", "jq", "tmux", "emacs", "nvim")
+    run(sys.executable, "-m", "unittest", "discover", "-s", "scripts/tests", "-v")
+    for suite in ("emacs-config.el", "emacs-workflow.el"):
+        with tempfile.TemporaryDirectory(prefix="tilde-ert-") as home:
+            run("emacs", "-Q", "--batch", "-l", "scripts/tests/" + suite,
+                "-f", "ert-run-tests-batch-and-exit",
+                environment={"HOME": home, "XDG_CONFIG_HOME": home + "/.config",
+                             "XDG_CACHE_HOME": home + "/.cache"})
+    run("nvim", "--headless", "--clean", "-l", "scripts/tests/nvim.lua")
+
+
+def smoke():
+    require("emacs")
+    run("emacs", "-Q", "--batch", "-l", "scripts/tests/emacs-smoke.el")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("check", choices=("lint", "typecheck", "test", "smoke", "all"))
+    choice = parser.parse_args().check
+    checks = {"lint": lint, "typecheck": typecheck, "test": test, "smoke": smoke}
+    selected = ("lint", "typecheck", "test") if choice == "all" else (choice,)
+    results = []
+    for name in selected:
+        try:
+            checks[name]()
+        except (OSError, ValueError, SyntaxError, RuntimeError, subprocess.CalledProcessError) as error:
+            print(str(error), file=sys.stderr)
+            results.append({"check": name, "ok": False})
+            print(json.dumps(results))
+            return 1
+        results.append({"check": name, "ok": True})
+    print(json.dumps(results))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

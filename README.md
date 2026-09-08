@@ -98,6 +98,18 @@ Two diagnostics answer two different questions:
 formulae and casks that are installed but that the `Brewfile` does
 not declare.
 
+## Configuration regression checks
+
+```sh
+make test-tools   # explicit: install ShellCheck and pinned Pyright
+make verify       # lint, typecheck, tests; no provisioning
+make smoke        # optional full-init Emacs check with installed packages
+```
+
+See [verification scope and limitations](docs/verification.md),
+[shell startup](docs/shell-startup.md), [Emacs workflow](docs/emacs-workflow.md),
+and [terminal workflow](docs/terminal-workflow.md).
+
 ## GitHub SSH key registration
 
 GitHub treats SSH keys in two independent categories on your account:

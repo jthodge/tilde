@@ -13,6 +13,7 @@ TMUX = shutil.which("tmux")
 @unittest.skipUnless(TMUX and Path("/opt/homebrew/bin/fish").exists(), "macOS tmux and fish required")
 class TmuxTest(unittest.TestCase):
     def test_plugins_cannot_override_shell_and_clipboard_is_scoped(self):
+        assert TMUX is not None
         with tempfile.TemporaryDirectory(prefix="tilde-tmux-") as name:
             home = Path(name)
             socket = home / "socket"

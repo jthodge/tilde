@@ -20,11 +20,11 @@
 #   scripts/check fish git     # only the named packages
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
+cd "$REPO" || exit 1
 
 # Directories that are deliberately not stow packages.
-NOT_PACKAGES=(docs scripts)
+NOT_PACKAGES=(docs scripts .github)
 
 declared() { grep -v '^#' .stow-packages | grep -v '^[[:space:]]*$'; }
 

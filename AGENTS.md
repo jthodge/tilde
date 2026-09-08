@@ -29,6 +29,8 @@ Discipline for any agent (human or otherwise) that touches this repo.
     report `MISSING`, `DRIFT`, or `UNDECLARED`.
   - `make brew` / `make brew-diff` — install the declared Homebrew
     packages, or list installed packages that the Brewfile omits.
+  - `make verify` — run lint, Python typecheck, and isolated regression tests.
+    Installs nothing; missing tools are errors. See `docs/verification.md`.
   - `make help` — list every target.
 - Run `make check` after any change to `.stow-packages`, and whenever
   an app might have replaced a link with a real file.
@@ -92,12 +94,13 @@ visual state is identical across them.
   preferences explicitly, never overwrite them with the template.
   See `docs/config-ownership.md` for the complete ownership model.
 - Claude Code slash commands: `claude/.claude/commands/*.md`. Each
-  command's `allowed-tools` frontmatter scopes its permissions
-  independently of the root settings; using the command IS the
-  authorization.
+  command's `allowed-tools` frontmatter scopes its tool access.
+  Tool access is not publishing authorization. Signing and explicit
+  push, merge, and force-push requirements still apply.
 - Per-directory scoped permissions: `<dir>/.claude/settings.local.json`
-  narrows the agent surface for work confined to that directory
+  records permissions for directory-specific workflows
   (e.g., `scripts/.claude/settings.local.json` for the gh-API tools).
+  These settings are not an operating-system sandbox.
 - Pi harness: `pi/.pi/agent/`. Subagents (scout/planner/worker/
   reviewer) decompose work by model tier; presets (`plan`, `implement`)
   toggle model + tool surface; extensions live in

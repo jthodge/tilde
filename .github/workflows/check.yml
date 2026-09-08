@@ -1,0 +1,22 @@
+name: Configuration checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verification tools
+        run: |
+          brew install emacs fish jq neovim shellcheck tmux
+          version=$(awk '/^PYRIGHT_VERSION :=/ { print $3 }' Makefile)
+          npm install --global "pyright@$version"
+      - name: Verify without editor packages or deployment
+        run: make verify

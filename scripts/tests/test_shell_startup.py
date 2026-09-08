@@ -66,13 +66,15 @@ class FishStartupTests(unittest.TestCase):
         self.home = self.tmp / "home"
         self.fish_cfg = self.home / ".config" / "fish"
         self.fish_cfg.mkdir(parents=True)
-        # Copy tracked config verbatim.
-        for item in FISH_SRC.iterdir():
-            dst = self.fish_cfg / item.name
-            if item.is_dir():
-                shutil.copytree(item, dst)
-            else:
-                shutil.copy2(item, dst)
+        # Copy tracked sources only, never local.fish or universal state.
+        names = subprocess.check_output(
+            ["git", "ls-files", "-z", "--", "fish/.config/fish"], cwd=str(REPO)
+        ).decode().split("\0")
+        for name in filter(None, names):
+            item = REPO / name
+            dst = self.fish_cfg / item.relative_to(FISH_SRC)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, dst)
 
         # Fake-executable PATH with a log for every invocation.
         self.bin = self.tmp / "bin"

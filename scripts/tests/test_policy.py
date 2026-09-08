@@ -7,6 +7,11 @@ COMMANDS = ROOT / "claude/.claude/commands"
 
 
 class PolicyTest(unittest.TestCase):
+    def test_repository_tool_access_is_not_publication_authority(self):
+        text = (ROOT / "AGENTS.md").read_text()
+        self.assertNotIn("using the command IS", text)
+        self.assertIn("Tool access is not publishing authorization", text)
+
     def test_pr_ceremony_stops_on_signing_failure(self):
         text = (COMMANDS / "pr-ceremony.md").read_text()
         self.assertNotIn("Local commits may need", text)

@@ -169,7 +169,8 @@
             (with-temp-file exe (insert "#!/bin/sh\nexit 0\n"))
             (set-file-modes exe #o755)
             (with-temp-file file (insert "export const x = 1;\n"))
-            (with-current-buffer (find-file-noselect file)
+            (with-current-buffer (generate-new-buffer " *tilde-ts-test*")
+              (setq buffer-file-name file)
               (unwind-protect
                   (progn
                     (should (equal (my/typescript-project-server) exe))
@@ -183,10 +184,10 @@
             (with-temp-file fake-exe (insert "#!/bin/sh\nexit 0\n"))
             (set-file-modes fake-exe #o755)
             (let ((exec-path (cons root exec-path))
-                  (buf (find-file-noselect
-                        (expand-file-name "isolated.ts" root))))
+                  (buf (generate-new-buffer " *tilde-ts-fallback*")))
               (unwind-protect
                   (with-current-buffer buf
+                    (setq buffer-file-name (expand-file-name "isolated.ts" root))
                     (should (null (my/typescript-project-server)))
                     (my/typescript-configure-server)
                     (should (equal lsp-clients-typescript-tls-path fake-exe)))

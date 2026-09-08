@@ -17,7 +17,9 @@ PACKAGES    := $(shell grep -v '^$(HASH)' .stow-packages | grep -v '^[[:space:]]
 # Default to the action that changes nothing.
 .DEFAULT_GOAL := dry-run
 
-.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins
+PYRIGHT_VERSION := 1.1.403
+
+.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools
 
 help: ## Show this help
 	@echo "Packages: $(PACKAGES)"
@@ -53,6 +55,25 @@ brew-diff: ## Show installed packages that the Brewfile does not declare
 	@comm -23 \
 		<(brew list --cask -1 | sort -u) \
 		<(grep '^cask "' Brewfile | sed -e 's/^cask "//' -e 's/".*//' -e 's|.*/||' | sort -u)
+
+lint: ## Check shell, Python, JSON, Lisp and Lua syntax
+	@python3 scripts/verify lint
+
+typecheck: ## Type-check the Python configuration tools and tests
+	@python3 scripts/verify typecheck
+
+test: ## Run isolated configuration regression tests
+	@python3 scripts/verify test
+
+verify: ## Run lint, typecheck and tests without installing packages
+	@python3 scripts/verify all
+
+smoke: ## Load Emacs offline with installed packages and temporary state
+	@python3 scripts/verify smoke
+
+test-tools: ## Install the declared verification dependencies explicitly
+	brew install shellcheck
+	uv tool install pyright==$(PYRIGHT_VERSION)
 
 doctor: ## Read-only environment probe (JSON on stdout, summary on stderr)
 	@scripts/doctor
