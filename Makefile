@@ -17,7 +17,7 @@ PACKAGES    := $(shell grep -v '^$(HASH)' .stow-packages | grep -v '^[[:space:]]
 # Default to the action that changes nothing.
 .DEFAULT_GOAL := dry-run
 
-.PHONY: help dry-run switch unstow check brew brew-diff
+.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins
 
 help: ## Show this help
 	@echo "Packages: $(PACKAGES)"
@@ -51,3 +51,20 @@ brew-diff: ## Show installed packages that the Brewfile does not declare
 	@comm -23 \
 		<(brew list --cask -1 | sort -u) \
 		<(grep '^cask "' Brewfile | sed -e 's/^cask "//' -e 's/".*//' -e 's|.*/||' | sort -u)
+
+doctor: ## Read-only environment probe (JSON on stdout, summary on stderr)
+	@scripts/doctor
+
+tools: ## Bootstrap runtime toolchain from scripts/runtime-versions.env
+	@scripts/setup-tools --install
+
+plugins: ## Init git submodules and install TPM plugins (explicit only)
+	@test -f "$(HOME)/.tmux.conf" || { echo 'Run make switch before make plugins' >&2; exit 1; }
+	git submodule update --init --recursive
+	tmux start-server \; set-environment -g TMUX_PLUGIN_MANAGER_PATH "$(HOME)/.tmux/plugins/"
+	@if [ -x tmux/.tmux/plugins/tpm/bin/install_plugins ]; then \
+		tmux/.tmux/plugins/tpm/bin/install_plugins; \
+	else \
+		echo "tpm/bin/install_plugins missing; run 'git submodule update --init --recursive'" >&2; \
+		exit 1; \
+	fi

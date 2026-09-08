@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+"""Read-only environment diagnostic.
+
+Emits a machine-readable JSON report on STDOUT and a short human
+summary on STDERR. The script never executes a discovered tool,
+never sources a shell startup file, never reads credentials, and
+never mutates anything on disk.
+
+Exit codes:
+    0  every required tool is present, submodules initialised, TPM
+       plugins installed.
+    1  a required tool, submodule, or TPM plugin is missing, OR the
+       Volta default for node / pnpm / yarn drifts from the manifest.
+
+Optional editor / language servers are reported under
+`optional_tools` and never affect the exit code.
+
+Prerequisites: python3 (Python stdlib only) and Xcode Command Line
+Tools (for /usr/bin/python3 on stock macOS).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+MANIFEST = REPO / "scripts" / "runtime-versions.env"
+GITMODULES = REPO / ".gitmodules"
+TPM_DIR = REPO / "tmux" / ".tmux" / "plugins" / "tpm"
+TPM_PLUGINS_DIR = REPO / "tmux" / ".tmux" / "plugins"
+
+# Required tools every workstation needs before `make switch` is
+# meaningful. Homebrew ships most of them via the Brewfile.
+REQUIRED_TOOLS = [
+    "stow",
+    "fish",
+    "node",
+    "pnpm",
+    "yarn",
+    "git",
+    "brew",
+    "volta",
+    "uv",
+    "mise",
+    "jq",
+    "python3",
+    "tmux",
+    "fzf",
+    "rg",
+    "fd",
+    "zoxide",
+    "gh",
+]
+
+# Reported but never fail the run. These belong to editor / language
+# stacks that a fresh clone can defer.
+OPTIONAL_TOOLS = [
+    "nvim",
+    "emacs",
+    "shellcheck",
+    "bat",
+    "eza",
+    "delta",
+    "sesh",
+    "docker",
+    "op",
+    "go",
+    "gopls",
+    "ruff",
+    "pyright",
+    "typescript-language-server",
+    "prettier",
+]
+
+
+def which_all(name: str) -> list[str]:
+    """Return every executable named ``name`` on PATH, in order.
+
+    Mirrors shutil.which but does not stop at the first hit — the
+    extras are what surfaces a PATH-shadowing bug.
+    """
+    seen: list[str] = []
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if not entry:
+            continue
+        candidate = os.path.join(entry, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            if candidate not in seen:
+                seen.append(candidate)
+    return seen
+
+
+def probe_tool(name: str) -> dict:
+    chosen = shutil.which(name)
+    alternatives = which_all(name)
+    # Drop the chosen path from alternatives so the "shadowed by"
+    # list only surfaces additional hits.
+    extras = [p for p in alternatives if p != chosen]
+    return {
+        "name": name,
+        "present": bool(chosen),
+        "chosen": chosen,
+        "alternatives": extras,
+    }
+
+
+def read_manifest(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    out: dict = {}
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        out[key.strip()] = val.strip()
+    return out
+
+
+def volta_default(tool: str) -> str | None:
+    """Read Volta's local platform manifest; do not execute PATH commands."""
+    home = Path(os.environ.get("VOLTA_HOME", str(Path.home() / ".volta")))
+    try:
+        platform = json.loads((home / "tools/user/platform.json").read_text())
+        value = platform.get(tool)
+        if tool == "node" and isinstance(value, dict):
+            value = value.get("runtime")
+        return value if isinstance(value, str) else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def submodule_status() -> list[dict]:
+    """Report every declared submodule without recursing into git.
+
+    Uses .gitmodules as the source of truth so the check works even
+    when git is unavailable.
+    """
+    if not GITMODULES.is_file():
+        return []
+    entries: list[dict] = []
+    path = None
+    for raw in GITMODULES.read_text().splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("path"):
+            path = stripped.split("=", 1)[1].strip()
+        elif stripped.startswith("[submodule") and path:
+            path = None
+        if path and stripped.startswith("path"):
+            full = REPO / path
+            entries.append(
+                {
+                    "path": path,
+                    "initialised": full.is_dir() and any(full.iterdir()),
+                }
+            )
+            path = None
+    return entries
+
+
+def tpm_status() -> dict:
+    """Report TPM installation and configured plugin availability.
+
+    Reads tmux configs statically to discover `set -g @plugin '...'`
+    declarations. Never runs tmux, never invokes TPM.
+    """
+    tpm_installed = TPM_DIR.is_dir() and (TPM_DIR / "tpm").is_file()
+    declared: list[str] = []
+    for conf in (
+        REPO / "tmux" / ".tmux.conf",
+        REPO / "tmux" / ".config" / "tmux" / "tmux.conf",
+    ):
+        if not conf.is_file():
+            continue
+        for line in conf.read_text().splitlines():
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            if "@plugin" in s:
+                # set -g @plugin 'owner/name'
+                for quote in ("'", '"'):
+                    if quote in s:
+                        parts = s.split(quote)
+                        if len(parts) >= 2:
+                            declared.append(parts[1])
+                            break
+    missing: list[str] = []
+    for slug in declared:
+        name = slug.split("/", 1)[-1]
+        if not (TPM_PLUGINS_DIR / name).is_dir():
+            missing.append(slug)
+    return {
+        "tpm_installed": tpm_installed,
+        "declared_plugins": declared,
+        "missing_plugins": missing,
+    }
+
+
+def build_report() -> dict:
+    manifest = read_manifest(MANIFEST)
+    runtimes = {}
+    for tool, key in (
+        ("node", "NODE_VERSION"),
+        ("pnpm", "PNPM_VERSION"),
+        ("yarn", "YARN_VERSION"),
+    ):
+        runtimes[tool] = {
+            "manifest_version": manifest.get(key),
+            "volta_default": volta_default(tool),
+        }
+
+    required = [probe_tool(t) for t in REQUIRED_TOOLS]
+    optional = [probe_tool(t) for t in OPTIONAL_TOOLS]
+    submodules = submodule_status()
+    tpm = tpm_status()
+
+    missing_required = [t["name"] for t in required if not t["present"]]
+    missing_submodules = [s["path"] for s in submodules if not s["initialised"]]
+
+    runtime_drift = []
+    for tool, info in runtimes.items():
+        if not info["manifest_version"] or (
+            info["manifest_version"] != info["volta_default"]
+        ):
+            runtime_drift.append(
+                {
+                    "tool": tool,
+                    "manifest": info["manifest_version"],
+                    "installed": info["volta_default"],
+                }
+            )
+
+    ok = (
+        not missing_required
+        and not missing_submodules
+        and not tpm["missing_plugins"]
+        and tpm["tpm_installed"]
+        and not runtime_drift
+    )
+
+    return {
+        "ok": ok,
+        "repo": str(REPO),
+        "manifest": manifest,
+        "runtimes": runtimes,
+        "runtime_drift": runtime_drift,
+        "required_tools": required,
+        "optional_tools": optional,
+        "missing_required": missing_required,
+        "submodules": submodules,
+        "missing_submodules": missing_submodules,
+        "tpm": tpm,
+    }
+
+
+def render_summary(report: dict) -> str:
+    lines = []
+    lines.append(f"doctor: repo={report['repo']}")
+    if report["missing_required"]:
+        lines.append("REQUIRED MISSING: " + ", ".join(report["missing_required"]))
+    else:
+        lines.append("required tools: all present")
+    if report["runtime_drift"]:
+        for d in report["runtime_drift"]:
+            lines.append(
+                f"RUNTIME DRIFT: {d['tool']} manifest={d['manifest']} "
+                f"installed={d['installed']}"
+            )
+    if report["missing_submodules"]:
+        lines.append("SUBMODULES MISSING: " + ", ".join(report["missing_submodules"]))
+    if not report["tpm"]["tpm_installed"]:
+        lines.append("TPM: not installed at tmux/.tmux/plugins/tpm")
+    if report["tpm"]["missing_plugins"]:
+        lines.append("TPM PLUGINS MISSING: " + ", ".join(report["tpm"]["missing_plugins"]))
+    missing_opt = [t["name"] for t in report["optional_tools"] if not t["present"]]
+    if missing_opt:
+        lines.append("optional missing (informational): " + ", ".join(missing_opt))
+    # Surface PATH-shadowing candidates.
+    for group in ("required_tools", "optional_tools"):
+        for t in report[group]:
+            if t["alternatives"]:
+                lines.append(
+                    f"PATH shadow: {t['name']} chose {t['chosen']} "
+                    f"(also on PATH: {', '.join(t['alternatives'])})"
+                )
+    lines.append("verdict: OK" if report["ok"] else "verdict: PROBLEMS FOUND")
+    return "\n".join(lines) + "\n"
+
+
+def main() -> int:
+    report = build_report()
+    json.dump(report, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+    sys.stderr.write(render_summary(report))
+    return 0 if report["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

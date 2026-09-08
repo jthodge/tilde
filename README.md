@@ -2,37 +2,96 @@
 
 Personal macOS dotfiles, deployed via [GNU Stow][stow].
 
+## Prerequisites (manual, one-time)
+
+Bootstrap is intentionally explicit — no target here installs
+Homebrew, unlocks 1Password, or grants macOS accessibility
+permissions on your behalf. Do the following by hand, once per
+machine, as required for the full setup:
+
+1. **Xcode Command Line Tools** — `xcode-select --install`.
+   Supplies `git`, `/usr/bin/python3` (which `scripts/doctor` and
+   the unit tests use), and the linker the Brewfile depends on.
+2. **Homebrew** — install per
+   [brew.sh](https://brew.sh). `make brew` then reads the
+   Brewfile; it never bootstraps Homebrew itself.
+3. **1Password + SSH agent** — install the desktop app, unlock the
+   vault, and enable the SSH agent (Settings → Developer →
+   "Use the SSH agent"). Commit signing requires it and stops on
+   failure. The secret scanner runs without it. Never pass
+   `--no-gpg-sign`.
+4. **Private font — Berkeley Mono** — Alacritty and Ghostty both
+   pin Berkeley Mono at size 10 (see `AGENTS.md`). Install the
+   `.ttf` payload from your licensed download; the Brewfile cannot
+   distribute it.
+5. **App permissions** — Rectangle, Keyboard Maestro, Alfred,
+   Keycastr, and Superwhisper each need Accessibility / Input
+   Monitoring granted in System Settings → Privacy & Security
+   after their first launch.
+6. **Volta ownership of the JS toolchain** — Volta is the sole
+   owner of `node`, `pnpm`, `yarn`, and any `volta install`ed
+   binaries. Do not install Node from a `.pkg`, from `nvm`, or
+   from `brew install node`; the shims will fight over PATH.
+   `scripts/runtime-versions.env` records the pinned defaults
+   (currently Node 22.14.0, pnpm 10.15.0, yarn 4.4.0). To adopt a
+   new version, edit that file **and** run
+   `volta install <tool>@<version>` — `setup-tools` never rewrites
+   an existing default silently.
+
 ## Bootstrap
 
 ```sh
 git clone git@github.com:jthodge/tilde.git ~/tilde
 cd ~/tilde
-make brew      # install the Homebrew packages the Brewfile declares
-make           # = make dry-run: simulate the deployment, write nothing
-make switch    # deploy every package
-make check     # verify the live $HOME against this checkout
+make brew         # install the Homebrew packages the Brewfile declares
+scripts/setup-tools --check   # report toolchain plan, mutate nothing
+make tools        # explicit: bootstrap Volta node/pnpm/yarn if absent
+make              # = make dry-run: simulate the deployment, write nothing
+make switch       # deploy every package; resolve conflicts before proceeding
+make plugins      # explicit: init submodules + install TPM plugins
+make doctor       # JSON report on stdout, human summary on stderr
+make check        # verify the live $HOME against this checkout
 ```
 
 A `Makefile` wraps the workflow. Run `make help` for the full target
 list. `make` on its own is always safe: it simulates and writes
-nothing.
+nothing. `make brew`, `make tools`, and `make plugins` can install
+software and require an explicit invocation. No default target chains
+into them. `make tools` preserves existing Volta defaults and only
+creates `~/.venv/base` if absent.
 
 Each entry in `.stow-packages` mirrors a slice of `$HOME`; the
 file is the canonical list and every `make` target feeds it to
 `stow` verbatim. The `scripts/` directory is intentionally not
 stowed — its contents are invoked in place.
 
+> **No clean-machine validation.** This repo is not tested against
+> a fresh macOS install end-to-end. The list above is the proposed
+> bootstrap procedure; expect to reconcile app-owned config
+> drift (see `make check`) and permission prompts on first launch.
+
 ## Verifying a deployment
 
-`make check` (`scripts/check`) resolves every tracked file in every
-declared package to its path under `$HOME` and compares the two:
+Two diagnostics answer two different questions:
 
-- `MISSING` — the package is not stowed.
-- `DRIFT` — the target exists but resolves elsewhere. An application
-  replaced the link with a real file, so repo edits no longer reach
-  the live config.
-- `UNDECLARED` — a tracked directory that `.stow-packages` omits, so
-  a fresh bootstrap would skip it.
+- `make check` (`scripts/check`) — **does the deployed `$HOME`
+  match this checkout?** Resolves every tracked file in every
+  declared package to its path under `$HOME` and compares the two:
+  - `MISSING` — the package is not stowed.
+  - `DRIFT` — the target exists but resolves elsewhere. An
+    application replaced the link with a real file, so repo edits
+    no longer reach the live config.
+  - `UNDECLARED` — a tracked directory that `.stow-packages`
+    omits, so a fresh bootstrap would skip it.
+- `make doctor` (`scripts/doctor`) — **does the surrounding
+  environment satisfy the prerequisites?** Emits a JSON report on
+  stdout and a short human summary on stderr. Reports required
+  tools, optional editor tools separately, git submodule
+  initialisation, TPM plugin installation, and every alternative
+  copy of each tool on PATH (to surface shadowing). The doctor
+  never executes a discovered tool, never sources shell startup,
+  never reads credentials, and never mutates the tree. Requires
+  `python3` from the Xcode Command Line Tools.
 
 `make brew-diff` is the package-inventory equivalent: it lists
 formulae and casks that are installed but that the `Brewfile` does

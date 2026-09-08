@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Explicit runtime bootstrap.
+#
+# Reads scripts/runtime-versions.env and, in --install mode, provisions
+# the listed toolchain if (and only if) it is absent. --check mode
+# reports what would happen and mutates nothing.
+#
+# The script never overwrites an already-installed Volta default, never
+# runs `brew install`, never reads credentials, and never sources any
+# shell startup file. Homebrew, Volta, uv, mise, python3, and Xcode CLT
+# are prerequisites; install them once, by hand, before invoking this.
+#
+# Usage:
+#   scripts/setup-tools               # same as --check
+#   scripts/setup-tools --check       # report only, exit 0
+#   scripts/setup-tools --install     # bootstrap missing pieces
+#   scripts/setup-tools --help
+#
+# Exit codes:
+#   0  success (or --check completed)
+#   1  --install requested but a required prerequisite is absent
+#   2  invalid usage
+
+set -uo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MANIFEST="$REPO/scripts/runtime-versions.env"
+BASE_VENV="$HOME/.venv/base"
+export VOLTA_FEATURE_PNPM=1
+if [ "$#" -gt 1 ]; then
+  printf 'setup-tools: expected one option\n' >&2
+  exit 2
+fi
+
+MODE="check"
+case "${1:-}" in
+  ""|--check)   MODE="check"   ;;
+  --install)    MODE="install" ;;
+  -h|--help)
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+  *)
+    printf 'setup-tools: unknown argument: %s\n' "$1" >&2
+    exit 2
+    ;;
+esac
+
+if [ ! -r "$MANIFEST" ]; then
+  printf 'setup-tools: missing manifest: %s\n' "$MANIFEST" >&2
+  exit 1
+fi
+
+# Parse KEY=VALUE lines from the manifest. Ignore comments and blanks.
+# Never source it, so a stray shell expansion cannot execute.
+NODE_VERSION=""
+PNPM_VERSION=""
+YARN_VERSION=""
+while IFS= read -r line; do
+  case "$line" in
+    ''|\#*) continue ;;
+  esac
+  key="${line%%=*}"
+  val="${line#*=}"
+  case "$key" in
+    NODE_VERSION) NODE_VERSION="$val" ;;
+    PNPM_VERSION) PNPM_VERSION="$val" ;;
+    YARN_VERSION) YARN_VERSION="$val" ;;
+  esac
+done < "$MANIFEST"
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+log() { printf '[setup-tools:%s] %s\n' "$MODE" "$*" >&2; }
+
+plan_volta() {
+  local tool="$1" version="$2"
+  if ! have volta; then
+    log "MISSING volta; cannot manage $tool@$version"
+    return 2
+  fi
+  # Ask Volta what the current default resolves to. `volta list` writes
+  # to stdout; suppress errors so a missing tool returns cleanly.
+  local current
+  current="$(volta list "$tool" 2>/dev/null | grep -E "$tool@[0-9]" | grep '(default)' | head -1 || true)"
+  if [ -n "$current" ]; then
+    log "keep $tool default: $current"
+    return 1
+  fi
+  log "would install $tool@$version via Volta"
+  return 0
+}
+
+install_volta() {
+  local tool="$1" version="$2"
+  volta install "$tool@$version"
+}
+
+plan_uv_venv() {
+  if ! have uv; then
+    log "MISSING uv; cannot provision base venv"
+    return 2
+  fi
+  if [ -d "$BASE_VENV" ]; then
+    log "keep existing base venv at $BASE_VENV"
+    return 1
+  fi
+  log "would create base venv at $BASE_VENV via uv"
+  return 0
+}
+
+install_uv_venv() {
+  uv venv "$BASE_VENV"
+}
+
+rc=0
+
+for spec in "node:$NODE_VERSION" "pnpm:$PNPM_VERSION" "yarn:$YARN_VERSION"; do
+  tool="${spec%%:*}"
+  version="${spec##*:}"
+  if [ -z "$version" ]; then
+    log "SKIP $tool: no version in manifest"
+    continue
+  fi
+  plan_volta "$tool" "$version"
+  status=$?
+  if [ "$status" -eq 2 ]; then
+    rc=1
+    continue
+  fi
+  if [ "$MODE" = "install" ] && [ "$status" -eq 0 ]; then
+    install_volta "$tool" "$version" || rc=1
+  fi
+done
+
+# uv base venv is install-only. --check never touches disk.
+if [ "$MODE" = "install" ]; then
+  plan_uv_venv
+  status=$?
+  if [ "$status" -eq 2 ]; then
+    rc=1
+  elif [ "$status" -eq 0 ]; then
+    install_uv_venv || rc=1
+  fi
+else
+  # Report the plan without evaluating uv presence as an error in check.
+  if have uv && [ ! -d "$BASE_VENV" ]; then
+    log "would create base venv at $BASE_VENV via uv (install only)"
+  fi
+fi
+
+exit "$rc"
