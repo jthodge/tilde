@@ -1,60 +1,59 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, you can obtain one at http://mozilla.org/MPL/2.0/.
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+# Based on willkg/dotfiles: dotfiles/bin/uv-python-symlink.
+# Update only links into uv's managed Python directory. Never remove real files.
+set -euo pipefail
 
-# Sourced via @willkg:
-# https://github.com/willkg/dotfiles/blob/main/dotfiles/bin/uv-python-symlink
+fail() { printf 'uv-python-simlink: %s\n' "$*" >&2; exit 1; }
+command -v uv >/dev/null 2>&1 || fail 'uv is required'
+UVDIR=$(uv python dir) || fail 'cannot find the uv Python directory'
+[[ "$UVDIR" = /* && -d "$UVDIR" ]] || fail 'invalid uv Python directory'
+LOCALBIN="$HOME/.local/bin"
 
-# Creates symlinks in $HOME/.local/bin for python versions installed with uv.
+sources=()
+targets=()
+shopt -s nullglob
+for item in "$UVDIR"/cpython-*; do
+    base=${item##*/}
+    [[ "$base" =~ ^cpython-([0-9]+\.[0-9]+)\.[0-9]+- ]] || continue
+    minor=${BASH_REMATCH[1]}
+    source="$item/bin/python$minor"
+    [[ -x "$source" ]] || continue
+    sources+=("$source")
+    targets+=("$LOCALBIN/python$minor")
+done
+[[ ${#sources[@]} -gt 0 ]] || fail 'no supported managed Python installation found'
+latest=$(uv python find --managed-python) || fail 'cannot select a managed Python'
+[[ "$latest" = "$UVDIR/"* && -x "$latest" ]] || fail 'selected Python is not a managed executable'
+sources+=("$latest")
+targets+=("$LOCALBIN/python")
 
-LOCALBIN="${HOME}/.local/bin"
-UVDIR=$(uv python dir)
-
-# Create symlinks for pythonX.Y to uv-managed Pythons
-for ITEM in "${UVDIR}"/*
-do
-    BASEITEM=$(basename "${ITEM}")
-
-    FULLVERSION=$(echo "${BASEITEM}" | cut -d'-' -f 2)
-    MINORVERSION=$(echo "${FULLVERSION}" | rev | cut -f 2- -d '.' | rev)
-    DEST="${LOCALBIN}/python${MINORVERSION}"
-
-    if [[ -L "${DEST}" ]]
-    then
-        if [[ -e "${DEST}" ]]
-        then
-            echo "${DEST} already exists and is valid. Nothing to do."
-            continue
-        else
-            echo "${DEST} already exists but is broken. Removing."
-            rm "${DEST}"
-        fi
+# Validate every target before writing any link.
+for target in "${targets[@]}"; do
+    if [[ -L "$target" ]]; then
+        old=$(readlink "$target") || fail "cannot read $target"
+        [[ "$old" = "$UVDIR/"* ]] || fail "refuse foreign link: $target"
+    elif [[ -e "$target" ]]; then
+        fail "refuse existing file or directory: $target"
     fi
-
-    rm -rf "${DEST}"
-    ln -s "${UVDIR}/${BASEITEM}/bin/python${MINORVERSION}" "${DEST}"
-    echo "${DEST} created."
 done
 
-# Create symlink for python to latest uv-managed Python
-LATESTPYTHON=$(uv python find)
-DEST="${LOCALBIN}/python"
-
-if [[ -L "${DEST}" ]]
-then
-    if [[ -e "${DEST}" ]]
-    then
-        echo "${DEST} already exists and is valid. Nothing to do."
-        exit
-    else
-        echo "${DEST} already exists but is broken. Removing."
-        rm "${DEST}"
+mkdir -p "$LOCALBIN"
+temporary=$(mktemp -d "$LOCALBIN/.uv-python.XXXXXX")
+trap 'rm -f "$temporary/link"; rmdir "$temporary"' EXIT
+for ((i=0; i<${#targets[@]}; i++)); do
+    target=${targets[$i]}
+    source=${sources[$i]}
+    # Preserve an existing valid version link. The unversioned link follows uv.
+    if [[ "$target" != "$LOCALBIN/python" && -L "$target" && -e "$target" ]]; then
+        continue
     fi
-fi
-
-rm -rf "${DEST}"
-ln -s "${LATESTPYTHON}" "${DEST}"
-echo "${DEST} created."
-
+    if [[ -L "$target" && "$(readlink "$target")" = "$source" ]]; then
+        continue
+    fi
+    ln -s "$source" "$temporary/link"
+    mv -f "$temporary/link" "$target"
+    printf '%s\t%s\n' "$target" "$source"
+done
