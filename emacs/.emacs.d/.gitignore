@@ -64,3 +64,9 @@ ido.last
 
 # url library cache
 /url/
+
+# machine-local Custom output (durable declarations live in
+# modules/custom-settings.el; this file is loaded last if present)
+/custom.el
+/backups/
+/auto-save/

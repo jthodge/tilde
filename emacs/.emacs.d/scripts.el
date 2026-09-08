@@ -40,7 +40,7 @@ Result matches PHP’s `addslashes`."
                    (string 0) "\\\\0" step1 t t)))
     (delete-region beg end)
     (insert escaped)))
-(provide 'escape-texit)
+(provide 'escape-text)
 
 ;;; ================================================================
 ;;; COMBOBULATE TESTING UTILITIES

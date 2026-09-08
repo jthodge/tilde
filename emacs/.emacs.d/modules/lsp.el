@@ -152,10 +152,41 @@
   ;; Ensure volar is never activated
   (with-eval-after-load 'lsp-volar
     (setq lsp-volar-take-over-mode nil)
-    (setq lsp-volar-hybrid-mode nil))
+    (setq lsp-volar-hybrid-mode nil)))
 
-  ;; Disable company-mode warnings
-  (setq lsp-completion-provider :none))
+;;; ----------------------------------------------------------------
+;;; Shared completion setup (installed before any language module)
+;;; ----------------------------------------------------------------
+;;
+;; Every language module used to add its own duplicated lsp-mode-hook
+;; callback to set completion-at-point-functions and append Cape
+;; enhancers. That produced three near-identical closures and a real
+;; risk that a later hook silently changed the completion story for a
+;; particular language.
+;;
+;; A single hook installed here, before any language module has a
+;; chance to call `lsp-deferred', gives us exactly one CAPF provider
+;; (lsp-completion-at-point) with Cape appended as fallbacks. All
+;; language modules rely on this hook and add no completion callback
+;; of their own.
+
+(defun my/lsp-completion-setup ()
+  "Configure completion-at-point-functions in an LSP-managed buffer.
+Uses lsp-completion-at-point as the single primary provider and
+appends Cape enhancers when available. Buffer-local; does not
+touch the global completion setup."
+  (when (bound-and-true-p lsp-mode)
+    (setq-local completion-at-point-functions
+                (list #'lsp-completion-at-point))
+    (when (featurep 'cape)
+      (when (fboundp 'cape-yasnippet)
+        (add-to-list 'completion-at-point-functions #'cape-yasnippet t))
+      (when (fboundp 'cape-dabbrev)
+        (add-to-list 'completion-at-point-functions #'cape-dabbrev t))
+      (when (fboundp 'cape-file)
+        (add-to-list 'completion-at-point-functions #'cape-file t)))))
+
+(add-hook 'lsp-mode-hook #'my/lsp-completion-setup)
 
 ;; Configure Go language server (gopls)
 (with-eval-after-load 'lsp-mode
