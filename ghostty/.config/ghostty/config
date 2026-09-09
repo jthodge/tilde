@@ -2,6 +2,9 @@
 font-family = Berkeley Mono
 font-size = 10
 
+# Colors — match tmux's colour233 status-bar background.
+background = #121212
+
 # Window
 # macos-titlebar-style = hidden
 window-decoration = none
