@@ -1,7 +1,14 @@
 # Terminal workflow
 
-The tracked workflow remains Alacritty (primary), Ghostty (fallback), fish,
-tmux, sesh, and Neovim. Alt-h/j/k/l still crosses editor and tmux panes.
+The tracked workflow is Ghostty, fish, tmux, sesh, and Neovim. Ghostty is
+the sole supported terminal; Alacritty and iTerm2 are deprecated and removed
+from the package manifests. The retired Alacritty Stow package is removed.
+
+Ghostty explicitly launches `/opt/homebrew/bin/fish -l`, independent of the
+macOS account shell. Both Option keys act as Alt, so Alt-h/j/k/l crosses
+editor and tmux panes. Berkeley Mono 10pt, 14px padding, the tab-style
+titlebar, and existing Ghostty keybindings are retained. The minimal Tide
+prompt remains a preference, not a terminal rendering workaround.
 
 ## Selected changes
 
@@ -12,8 +19,9 @@ tmux, sesh, and Neovim. Alt-h/j/k/l still crosses editor and tmux panes.
   are unchanged. These are personal preferences, not correctness fixes.
 - tmux sets `XDG_CONFIG_HOME` for new panes and clears `default-command`
   **after** plugins load, so a plugin cannot replace fish with a stale shell.
-- Clipboard features extend tmux's built-in xterm declarations only for
-  `tmux*` and `alacritty*`, not every terminal.
+- Ghostty's default `xterm-ghostty` TERM matches tmux's built-in xterm
+  clipboard declarations. Only `tmux*` needs an extra declaration, not
+  every terminal. Reloading clears the retired terminal's override.
 
 `tmux-sensible` already provides the desired escape delay, focus events, and
 scrollback size. There is no need to duplicate those settings.
@@ -23,7 +31,14 @@ scrollback size. There is no need to duplicate those settings.
 ```sh
 nvim --headless --clean -l scripts/tests/nvim.lua
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p test_tmux.py
+/Applications/Ghostty.app/Contents/MacOS/ghostty +validate-config
 ```
+
+After changing the config, reload Ghostty with Cmd+Shift+, or restart it.
+Use new terminal surfaces to verify shell changes. Inside tmux, prefix + r
+reloads its config without replacing existing pane processes. Pin Ghostty
+in the Dock manually; old terminal preferences are not deleted by a normal
+Homebrew uninstall (do not use `--zap` unless intentionally purging them).
 
 The Neovim check parses Lua and inspects key declarations with plugin stubs.
 The tmux test runs a private server with a stub plugin that attempts to change

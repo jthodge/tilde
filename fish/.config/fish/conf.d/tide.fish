@@ -1,8 +1,8 @@
 # Tide prompt configuration — minimal, glyph-free.
 # Left prompt only: truncated pwd + git branch/status, then the prompt char on a new line.
-# The right prompt (versions, infra context, time) is intentionally empty: Alacritty's
-# renderer (crossfont) cannot draw Nerd Font glyphs, so situational awareness is pulled on
-# demand instead — see docs/prompt-and-awareness.md (the `ctx` snapshot + per-tool commands).
+# The right prompt (versions, infra context, time) is intentionally empty to reduce noise.
+# Situational awareness is pulled on demand — see docs/prompt-and-awareness.md
+# for per-tool commands and an optional `ctx` snapshot (not installed).
 # Segment colors below are retained so any right-prompt segment can be re-enabled simply by
 # adding it back to tide_right_prompt_items.
 
@@ -15,7 +15,7 @@ set -g _tide_color_light_blue 00AFFF
 
 # Layout
 set -g tide_left_prompt_items pwd git newline
-# Right prompt intentionally empty — awareness is pulled via `ctx`, not pushed to the prompt.
+# Right prompt intentionally empty — query context on demand instead.
 # To restore the full Spaceship-equivalent set, replace the empty line below with:
 #   set -g tide_right_prompt_items status cmd_duration context jobs direnv node python rustc go kubectl aws terraform time
 set -g tide_right_prompt_items
@@ -54,7 +54,7 @@ set -g tide_pwd_color_anchors $_tide_color_light_blue
 set -g tide_pwd_color_dirs $_tide_color_dark_blue
 set -g tide_pwd_color_truncated_dirs 8787AF
 set -g tide_pwd_markers .bzr .citc .git .hg .node-version .python-version .ruby-version .shorten_folder_marker .svn .terraform bun.lockb Cargo.toml composer.json CVS go.mod package.json build.zig
-# Glyph-free: drop the Nerd Font folder/home/lock icons (Alacritty can't render them).
+# Omit Nerd Font folder/home/lock icons to keep the prompt minimal.
 set -g tide_pwd_icon ''
 set -g tide_pwd_icon_home ''
 set -g tide_pwd_icon_unwritable ''

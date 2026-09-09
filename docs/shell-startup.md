@@ -1,8 +1,9 @@
 # Shell startup
 
-Fish is the primary interactive shell. Alacritty selects `fish -l`;
-Ghostty uses the account shell. Zsh and Bash retain legacy configuration
-for direct use. This change does not alter the macOS account shell.
+Fish is the primary interactive shell. Ghostty, the sole supported
+terminal, explicitly selects `/opt/homebrew/bin/fish -l`. Zsh and Bash
+retain legacy configuration for direct use. This does not alter the
+macOS account shell.
 
 All three shells share four rules:
 

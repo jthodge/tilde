@@ -10,6 +10,23 @@ ROOT = Path(__file__).resolve().parents[2]
 TMUX = shutil.which("tmux")
 
 
+class TerminalConfigTest(unittest.TestCase):
+    def test_ghostty_is_the_only_declared_terminal(self):
+        packages = (ROOT / ".stow-packages").read_text().splitlines()
+        brewfile = (ROOT / "Brewfile").read_text().splitlines()
+        self.assertIn("ghostty", packages)
+        self.assertIn('cask "ghostty"', brewfile)
+        for retired in ("alacritty", "iterm2"):
+            self.assertNotIn(retired, packages)
+            self.assertNotIn(f'cask "{retired}"', brewfile)
+            self.assertFalse((ROOT / retired).exists())
+
+    def test_ghostty_preserves_fish_and_alt_navigation(self):
+        config = (ROOT / "ghostty/.config/ghostty/config").read_text().splitlines()
+        self.assertIn("command = /opt/homebrew/bin/fish -l", config)
+        self.assertIn("macos-option-as-alt = true", config)
+
+
 @unittest.skipUnless(TMUX and Path("/opt/homebrew/bin/fish").exists(), "macOS tmux and fish required")
 class TmuxTest(unittest.TestCase):
     def test_plugins_cannot_override_shell_and_clipboard_is_scoped(self):
@@ -38,8 +55,11 @@ class TmuxTest(unittest.TestCase):
                                  "XDG_CONFIG_HOME=" + str(home / ".config"))
                 features = run("show-options", "-gv", "terminal-features")
                 self.assertIn("tmux*:clipboard", features)
-                self.assertIn("alacritty*:clipboard", features)
+                self.assertIn("xterm*:clipboard", features)
+                self.assertNotIn("alacritty", features)
                 self.assertNotIn(",*:clipboard", features)
+                # Reload a server that still carries the retired terminal slot.
+                run("set-option", "-s", "terminal-features[11]", "alacritty*:clipboard")
                 run("source-file", str(config))
                 self.assertEqual(run("show-options", "-gv", "terminal-features"), features)
                 self.assertEqual(run("show-options", "-gv", "default-command"), "")

@@ -2,12 +2,11 @@
 
 ## Why this design
 
-Alacritty's renderer (`crossfont`) cannot draw Nerd Font glyphs, even from a
-glyph-complete font that CoreText maps correctly (verified: the font, the OS
-font lookup, and Alacritty's face loading all check out — only the rasterizer
-fails). Rather than keep fighting it, the prompt is **minimal and glyph-free**,
-modeled on a Mark-Tran-style prompt, and the situational awareness that a
-verbose prompt (Spaceship / Ghostty) used to *push* is now *pulled* on demand.
+Ghostty is the sole supported terminal. The prompt remains **minimal and
+without Nerd Font icons**, modeled on a Mark-Tran-style prompt. This is a
+low-noise preference, not a Ghostty rendering limitation. Situational
+awareness that a verbose prompt used to *push* is now *pulled* on demand.
+The optional `ctx` function below is a proposal, not an installed command.
 
 - **Push (old):** every prompt redraw shows node/python/rustc/go/kubectl/aws/tf
   versions + context, each behind a Nerd Font glyph.
@@ -24,7 +23,7 @@ every shell start and overrides any `fish_variables` universals).
 - `tide_pwd_icon`, `tide_pwd_icon_home`, `tide_pwd_icon_unwritable`,
   `tide_git_icon` = **empty** (the only Nerd glyphs left in the minimal prompt).
 
-Result: `~/path/to/dir  branch *dirty` then `❯` on the next line. Zero glyphs.
+Result: `~/path/to/dir  branch *dirty` then `❯` on the next line. No Nerd Font icons.
 
 **Restore any right-prompt segment** by editing that one line in `tide.fish`:
 

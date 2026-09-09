@@ -20,8 +20,8 @@ machine, as required for the full setup:
    "Use the SSH agent"). Commit signing requires it and stops on
    failure. The secret scanner runs without it. Never pass
    `--no-gpg-sign`.
-4. **Private font — Berkeley Mono** — Alacritty and Ghostty both
-   pin Berkeley Mono at size 10 (see `AGENTS.md`). Install the
+4. **Private font — Berkeley Mono** — Ghostty, the sole supported
+   terminal, pins Berkeley Mono at size 10 (see `AGENTS.md`). Install the
    `.ttf` payload from your licensed download; the Brewfile cannot
    distribute it.
 5. **App permissions** — Rectangle, Keyboard Maestro, Alfred,

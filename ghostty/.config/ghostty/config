@@ -12,6 +12,12 @@ cursor-style = block
 cursor-style-blink = true
 mouse-hide-while-typing = true
 
+# Shell — independent of the macOS account shell.
+command = /opt/homebrew/bin/fish -l
+
+# Preserve Alt-h/j/k/l navigation across tmux and Neovim panes.
+macos-option-as-alt = true
+
 # Shell integration
 shell-integration-features = no-cursor,ssh-env
 

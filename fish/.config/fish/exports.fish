@@ -1,10 +1,9 @@
 # Identity
 
 ## SHELL
-## Alacritty execs fish directly (no /usr/bin/login wrapper), so $SHELL
-## leaks from launchd's session env. Self-correct here so downstream
-## tools (git's editor chooser, completion emitters keying off $SHELL,
-## tmux's default-shell inheritance) see the truth.
+## Ghostty explicitly launches fish, independently of the account shell.
+## $SHELL can still be inherited from a different login environment.
+## Self-correct so downstream tools and tmux see the running shell.
 set -gx SHELL (command -v fish)
 
 ## 1Password SSH agent
