@@ -79,11 +79,13 @@ Before deleting an agent extension, alternate shell, or terminal:
 - Remove one unused mechanism at a time and run `make verify` and `make check`.
 - Keep signing, secret handling, and explicit publishing authority intact.
 
-The existing permission/path guards remain heuristic accident prevention, not
-an OS sandbox. Their runtime APIs are outside the new Python/Lisp/Lua test scope.
-No unmeasured agent or terminal workflow was deleted during this adoption.
+The permission/path guards remain heuristic accident prevention, not an OS
+sandbox. The follow-up now tests actual Pi callback source; see
+[agent boundaries](agent-boundaries.md). The duplicate web-search implementation
+was removed because the configured package already owns those tools, not because
+lack of use was measured. No terminal workflow was removed on that assumption.
 
-## Success criteria: evidence and remaining work
+## First-pass success criteria (historical)
 
 | Step | Result | Evidence or outstanding check |
 |---|---|---|
@@ -103,9 +105,68 @@ Pyright encountered Python 3.14 library syntax. Selecting Python 3.13 in CI and
 the current test interpreter for Pyright fixed it. Local verification also passed
 under Python 3.9 and Python 3.13. See `verification.md` for exact coverage.
 
-The final doctor probe reports all required tools present, with PATH alternatives.
+The first-pass doctor reported all required tools present, with PATH alternatives.
 An agent launched by Volta can inherit its own runtime image ahead of user shims;
 that probe is not a fresh-shell runtime test. The stored user defaults remain
 Node 22.14.0, pnpm 10.15.0, and yarn 4.4.0. Check the selected tools in fresh
 terminal, tmux, GUI-editor, and two-project sessions before claiming full runtime
 consistency. No existing runtime default was changed to silence a warning.
+
+## Eight-step follow-up: evidence and decisions
+
+Reassessed after the safety, startup, project-context, agent, capability,
+editor-context and recovery changes. The deployment remains a flat
+`.stow-packages` plus `Brewfile` on the observed Darwin arm64 workstation.
+No second managed host was established. A macOS CI runner is a test environment,
+not evidence that the user needs another personal host profile.
+
+**Decision: retain Stow and existing personal tools.** No Nix/host-profile layer,
+notes/task/mail migration, or extra terminal package is justified by the new
+evidence. The adoption gates above still apply. If one becomes real, record the
+host's required subset and ownership differences, then pilot deployment/removal
+on a disposable host. Preserve mandatory signing rather than copying a mentor's
+host-specific exception. A system generation does not restore app-owned data.
+
+| Follow-up step | Proven result | Remaining boundary |
+| --- | --- | --- |
+| 1. Scanner/checker | Staged blobs checked without printing matches; inspection failures rejected | Pattern scanning is not exhaustive secret detection |
+| 2. Optional startup | Empty-package full init edits five source types; invalid activation preserves the old environment | Errors inside a trusted activation script are not rolled back |
+| 3. Project context | Nested/mixed roots, hoisted tools and save-formatter selection tested | Real cold-start completion/diagnostics still need project use |
+| 4. Agent boundaries | Actual plan/gate callbacks tested; tool access round-trips; duplicate search wrapper removed | Not OS containment; global Git/LFS hook composition remains deferred |
+| 5. Capabilities | Installed formatters, compilers and LSP initialization exercised | 12/13 required pass; selected base Python lacks pytest; optional goimports absent |
+| 6. Editor context | History/recent-file persistence, safe refresh and same-named project separation tested | Daily context-switch reduction is unmeasured |
+| 7. Recovery | Migration/restore failure paths and exact package-copy runbook rehearsed on fixtures | No live migration, package upgrade, cross-version recovery or fresh-host rebuild performed |
+| 8. Reassessment | Explicit nonmigration decision and criteria for revisiting it | Host/personal-workflow demand must come from actual use |
+
+At this checkpoint, `make verify` covers 218 Python tests, 58 ERT tests and
+27 Pi callback tests, plus lint/typecheck. Installed-package smoke also passes.
+These are different claims from a fully working development environment:
+`make doctor` can pass while `make capabilities` correctly reports missing pytest.
+See [capabilities](development-capabilities.md) and
+[recovery](upgrades-and-recovery.md) for the actionable commands and limits.
+
+One ownership discrepancy remains: the inspected Volta Pi metadata records
+package version **0.84.1**, while the installed package's `package.json` records
+**0.85.1**. Its package platform selects Node **24.18.0**; user runtime defaults
+remain **22.14.0 / 10.15.0 / 4.4.0**. Metadata was read, not authentication state;
+no installation was reconciled. Review both metadata and payload during the next
+intentional Pi upgrade rather than treating either as a full recovery manifest.
+
+### Short real-use trial, not another application migration
+
+Use existing projects and the existing notes location for two weeks. Record
+only task, action count, wrong-root incidents and outcome—not credentials or
+private source—in a small private worksheet:
+
+1. Open a project, find a symbol, run file/nearest tests and follow an error.
+2. Switch between two same-named repositories; verify shell and compilation
+   output stay with the intended root, then return with `C-c p b`.
+3. Restart Emacs and reopen work through `C-c r`; check that external refresh
+   preserves unsaved edits.
+4. Retrieve a prior decision using the existing notes/search tools.
+
+Keep a convenience if it saves repeated actions without wrong-root or data-loss
+incidents. Record a specific failure before adding Popper/beframe, another
+terminal, Denote, or host profiles. This trial has **not** been run by the user
+as part of the implementation. The new capability/migration helpers are also
+maintenance commitments, not free evidence of a better daily workflow.

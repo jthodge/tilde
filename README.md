@@ -72,7 +72,7 @@ stowed — its contents are invoked in place.
 
 ## Verifying a deployment
 
-Two diagnostics answer two different questions:
+Three diagnostics answer different questions:
 
 - `make check` (`scripts/check`) — **does the deployed `$HOME`
   match its ownership rules?** Checks repository-owned links and
@@ -93,6 +93,11 @@ Two diagnostics answer two different questions:
   never executes a discovered tool, never sources shell startup,
   never reads credentials, and never mutates the tree. Requires
   `python3` from the Xcode Command Line Tools.
+- `make capabilities` — **do installed language tools work on synthetic inputs?**
+  Explicitly runs test runners, formatters, compilers and LSP initialization;
+  installs nothing. Required failures return nonzero. See
+  [development capabilities](docs/development-capabilities.md), including the
+  project-interpreter override and the known missing base-environment pytest.
 
 `make brew-diff` is the package-inventory equivalent: it lists
 formulae and casks that are installed but that the `Brewfile` does
@@ -110,7 +115,9 @@ See [verification scope and limitations](docs/verification.md),
 [shell startup](docs/shell-startup.md), [Emacs workflow](docs/emacs-workflow.md),
 and [terminal workflow](docs/terminal-workflow.md).
 [Adoption decisions and open checks](docs/adoption-decisions.md) records why
-Stow and the existing personal tools remain in place.
+Stow and the existing personal tools remain in place. See
+[reviewed upgrades and recovery](docs/upgrades-and-recovery.md) before changing
+installed packages or migrating seed-only local settings.
 
 ## GitHub SSH key registration
 
@@ -161,10 +168,12 @@ via Volta for parity with the rest of the JS toolchain:
 volta install @earendil-works/pi-coding-agent
 ```
 
-Volta records the pinned version in its toolchain (visible via
-`volta list`). Pi 0.75+ requires Node ≥ 22.19.0; on older Node, Volta
-will resolve to the latest compatible 0.74.x. Update Node via
-`volta install node@22.19.0` to unlock newer Pi releases.
+Check both the installed package's Node engine requirement and Volta's
+package-specific runtime before upgrading. The reviewed Pi 0.85.1 package
+requires Node ≥ 22.19.0; its Volta platform selects Node 24.18.0 independently
+of this repo's user default, Node 22.14.0. Do not change the user default just
+to make those two runtimes match. Package-manager metadata and installed
+payload versions can also drift; see the [reassessment](docs/adoption-decisions.md).
 
 Authenticate via OAuth subscriptions rather than API keys:
 
