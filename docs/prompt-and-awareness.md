@@ -2,9 +2,9 @@
 
 ## Why this design
 
-Ghostty is the sole supported terminal. The prompt remains **minimal and
-without Nerd Font icons**, modeled on a Mark-Tran-style prompt. This is a
-low-noise preference, not a Ghostty rendering limitation. Situational
+Ghostty is the sole supported terminal. The prompt is Mark Tran's small
+Fish-native implementation, with no prompt framework or Nerd Font icons.
+This is a low-noise preference, not a Ghostty rendering limitation. Situational
 awareness that a verbose prompt used to *push* is now *pulled* on demand.
 The optional `ctx` function below is a proposal, not an installed command.
 
@@ -13,26 +13,44 @@ The optional `ctx` function below is a proposal, not an installed command.
 - **Pull (now):** the prompt shows only `pwd` + git; you query the rest with a
   command when you actually need it.
 
-## (1) The prompt — what changed
+## (1) The prompt
 
-Source of truth: `fish/.config/fish/conf.d/tide.fish` (tracked; `set -g` runs on
-every shell start and overrides any `fish_variables` universals).
+Sources of truth:
 
-- `tide_left_prompt_items` = `pwd git newline` (unchanged — already minimal).
-- `tide_right_prompt_items` = **empty** (was the full Spaceship-equivalent set).
-- `tide_pwd_icon`, `tide_pwd_icon_home`, `tide_pwd_icon_unwritable`,
-  `tide_git_icon` = **empty** (the only Nerd glyphs left in the minimal prompt).
+- `fish/.config/fish/functions/fish_prompt.fish`
+- `fish/.config/fish/functions/set_pwd_color.fish`
+- The three `__fish_git_prompt_*` settings in `fish/.config/fish/colors.fish`
 
-Result: `~/path/to/dir  branch *dirty` then `❯` on the next line. No Nerd Font icons.
+The two functions are copied verbatim from Mark Tran's `tilde` checkout at
+revision `9deaa1a4f0748c8e39adff28c632916636c33186`, under
+`nix/files/fish/functions/`. The Git settings match his
+`nix/files/fish/config.d/git-prompt.fish`. His checkout is not a runtime or
+test dependency. Fish supplies `prompt_pwd` and `__fish_git_prompt` (the latter
+is a compatibility wrapper for `fish_git_prompt` in current Fish).
 
-**Restore any right-prompt segment** by editing that one line in `tide.fish`:
+- One line: shortened directory, then Git branch/state, then the command.
+- Directory is magenta locally and blue when `SSH_CLIENT` is nonempty.
+- Branch is yellow; unstaged changes use `±`; Fish also supplies staged state.
+- No frames, background blocks, extra prompt character, or right prompt.
+- Untracked/stash/upstream counters and exit-status coloring are not enabled.
+- `VIRTUAL_ENV_DISABLE_PROMPT=1` in `exports.fish` prevents Python activation
+  from adding a venv prefix. Syntax highlighting and tool integrations are unchanged.
 
-```fish
-set -g tide_right_prompt_items status cmd_duration context jobs direnv node python rustc go kubectl aws terraform time
+Example, with an unstaged change:
+
+```text
+~/s/project (master ±) git status
 ```
 
-Segment colors are retained in `tide.fish`, so re-enabling a segment needs no
-other change. To see the change in an already-running shell: `exec fish`.
+Tide's implementation, configuration, completions, and plugin entry are removed.
+`fish_plugins` is intentionally empty; Fisher remains available but has no
+prompt plugin to install. Do not run `fisher remove` against the replacement:
+Tide's old file inventory includes `fish_prompt.fish`, which now belongs to this
+repository's Fish-native implementation.
+
+In each already-running Fish shell, run `exec fish -l` to discard the old
+in-memory Tide functions and load the replacement. Merely sourcing `config.fish`
+is insufficient: it does not erase Tide's generated prompt/event functions.
 
 ## (2) Pull-based awareness — tools you already have
 

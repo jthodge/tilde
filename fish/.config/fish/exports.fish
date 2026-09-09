@@ -21,6 +21,8 @@ fish_add_path -p $VOLTA_HOME/bin
 ## uv
 fish_add_path -p $HOME/.local/bin
 set -gx UV_DEFAULT_VENV base
+# Keep activation scripts from wrapping the Fish-native prompt with a venv label.
+set -gx VIRTUAL_ENV_DISABLE_PROMPT 1
 
 # Go
 set -gx GOPATH $HOME/go

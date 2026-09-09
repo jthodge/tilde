@@ -39,11 +39,22 @@ Discipline for any agent (human or otherwise) that touches this repo.
 ## Terminals
 
 - Sole supported terminal: **Ghostty** (`ghostty/.config/ghostty/config`).
-  Berkeley Mono 10pt, tab-style titlebar, 14px padding, and an explicit
-  fish login shell (`/opt/homebrew/bin/fish -l`). Dock-pin manually.
+  Berkeley Mono 10pt, no window decorations, 14px padding, a `#121212`
+  background matching tmux, and an explicit fish login shell
+  (`/opt/homebrew/bin/fish -l`). Dock-pin manually.
 - Both Option keys act as Alt so M-h/j/k/l reaches tmux and Neovim.
 - Alacritty and iTerm2 are deprecated: do not reinstall them or restore
   their configuration packages. Keep terminal changes in Ghostty.
+
+## Fish prompt
+
+- Use Mark Tran's Fish-native prompt: `fish/.config/fish/functions/fish_prompt.fish`
+  and `set_pwd_color.fish`, with Git settings in `fish/.config/fish/colors.fish`.
+- One line, shortened directory (magenta locally, blue over SSH), yellow Git
+  branch, and `±` for unstaged changes. No frames, segment backgrounds, or
+  extra prompt character. Tide is removed; do not reinstall it.
+- `VIRTUAL_ENV_DISABLE_PROMPT` in `exports.fish` keeps Python activation from
+  wrapping the prompt. Shell integrations and syntax highlighting remain separate.
 
 ## Multiplexer
 

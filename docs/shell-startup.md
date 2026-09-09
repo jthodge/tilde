@@ -117,6 +117,9 @@ they lock in:
   `PATH`; use `npx`, `pnpm exec`, or a project-local script.
 - **Python**: uv owns provisioning. Only the base venv is auto-
   activated; per-project envs are the caller's responsibility.
+  `exports.fish` sets `VIRTUAL_ENV_DISABLE_PROMPT=1` before activation so
+  Python environments do not wrap the Fish-native prompt. This no longer
+  depends on Tide's universal variables.
 - **Homebrew**: adds `/opt/homebrew/{bin,sbin}` on macOS. Full
   `brew shellenv` is not invoked to avoid a subprocess per shell.
 

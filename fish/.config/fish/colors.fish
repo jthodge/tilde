@@ -1,7 +1,7 @@
-# Git prompt
-set __fish_git_prompt_showdirtystate yes
-set __fish_git_prompt_color_branch yellow
-set __fish_git_prompt_char_dirtystate '±'
+# Mark Tran's Fish-native Git prompt settings.
+set -g __fish_git_prompt_char_dirtystate '±'
+set -g __fish_git_prompt_color_branch yellow
+set -g __fish_git_prompt_showdirtystate yes
 
 # Syntax highlighting
 set fish_color_command 99ad6a

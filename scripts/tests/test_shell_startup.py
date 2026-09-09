@@ -193,6 +193,22 @@ class FishStartupTests(unittest.TestCase):
         # Still no uv invocation.
         self.assertNotIn("uv", "\n".join(self._log_lines()))
 
+    def test_autovenv_does_not_wrap_native_prompt(self) -> None:
+        """Prompt suppression is tracked, not dependent on Tide's old universal."""
+        venv = self.home / ".venv/base/bin"
+        venv.mkdir(parents=True)
+        (venv / "activate.fish").write_text(
+            'if test -z "$VIRTUAL_ENV_DISABLE_PROMPT"\n'
+            '    function fish_prompt; printf wrapped; end\n'
+            'end\n'
+        )
+        result = self._run_fish(
+            "function fish_prompt; printf native; end\n"
+            "__uv_autovenv\nfish_prompt"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "native")
+
     def test_autovenv_preserves_active_virtualenv(self) -> None:
         """An inherited VIRTUAL_ENV must not be overwritten."""
         # Provision an activation script that would replace VIRTUAL_ENV

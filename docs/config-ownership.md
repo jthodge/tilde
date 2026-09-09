@@ -16,7 +16,7 @@ not application data, credentials, package installations, or local preferences.
 | Neovim plugin installations | lazy.nvim | Unmanaged cache | Restore from the tracked lockfile; not from a full config checkout |
 | `~/.emacs.d/` source | Repository | Stow links | Edit modules in the repository |
 | Emacs Custom, packages, native cache, backups | Emacs | Ignored local state | Keep durable settings in modules; do not commit generated files |
-| fish prompt sources | Repository | Stow links | Vendored Tide remains tracked; update it as a separate reviewed change |
+| fish prompt sources | Repository | Stow links | Fish-native prompt and SSH-color helper copied from Mark Tran; Git settings live in `colors.fish`, with no prompt plugin |
 | fish universal variables and `local.fish` | fish / local user | Ignored local state | Do not make bootstrap depend on undeclared universal variables |
 | TPM | Git submodule | Explicit `make plugins` | Restore the submodule revision, then install declared plugins |
 | TPM plugin checkouts | TPM | Ignored runtime installs | `make plugins` installs them; updates are separate from Stow |

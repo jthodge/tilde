@@ -6,9 +6,10 @@ from the package manifests. The retired Alacritty Stow package is removed.
 
 Ghostty explicitly launches `/opt/homebrew/bin/fish -l`, independent of the
 macOS account shell. Both Option keys act as Alt, so Alt-h/j/k/l crosses
-editor and tmux panes. Berkeley Mono 10pt, 14px padding, the tab-style
-titlebar, and existing Ghostty keybindings are retained. The minimal Tide
-prompt remains a preference, not a terminal rendering workaround.
+editor and tmux panes. Ghostty uses Berkeley Mono 10pt, 14px padding,
+no window decorations, and a `#121212` background matching tmux's status bar.
+The Fish-native prompt matches Mark Tran's: one line, directory plus Git state, no frames
+or segment backgrounds. See [prompt and awareness](prompt-and-awareness.md).
 
 ## Selected changes
 
