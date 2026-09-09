@@ -19,7 +19,7 @@ PACKAGES    := $(shell grep -v '^$(HASH)' .stow-packages | grep -v '^[[:space:]]
 
 PYRIGHT_VERSION := 1.1.403
 
-.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools capabilities
+.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools capabilities migrate-claude
 
 help: ## Show this help
 	@echo "Packages: $(PACKAGES)"
@@ -83,6 +83,9 @@ capabilities: ## Probe declared dev capabilities on temp workspaces (no installs
 
 tools: ## Bootstrap runtime toolchain from scripts/runtime-versions.env
 	@scripts/setup-tools --install
+
+migrate-claude: ## Preview the sonnet-defaults-v1 Claude settings migration (read-only)
+	@python3 scripts/migrate-claude-settings
 
 plugins: ## Init git submodules and install TPM plugins (explicit only)
 	@test -f "$(HOME)/.tmux.conf" || { echo 'Run make switch before make plugins' >&2; exit 1; }

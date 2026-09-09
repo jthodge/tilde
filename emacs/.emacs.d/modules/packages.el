@@ -7,11 +7,14 @@
 ;; refresh and no install runs at startup. That keeps `emacs -Q` and
 ;; batch tests offline and deterministic.
 ;;
-;; To install or update the declared set interactively, run
+;; To install the declared set interactively, run
 ;;   M-x my/install-packages
-;; which refreshes archives once and then installs only what is
-;; missing. Missing tools produce a clear message; nothing is fetched
-;; automatically.
+;; which refreshes archives once and then installs only the packages
+;; that are missing. It does not upgrade installed packages. Reviewed
+;; upgrades and recovery live in docs/upgrades-and-recovery.md and use
+;; the built-in `list-packages` UI plus a private snapshot of
+;; `~/.emacs.d/elpa/`. Missing tools produce a clear message; nothing
+;; is fetched automatically.
 
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
@@ -45,6 +48,8 @@ Nothing here is installed at startup. Use `my/install-packages'.")
 
 (defun my/install-packages (&optional refresh)
   "Install any declared package that is not yet present.
+Does not upgrade already-installed packages; use the built-in
+`list-packages' UI (see docs/upgrades-and-recovery.md) for that.
 With prefix arg REFRESH, refresh archive contents first.
 Failures are reported and do not abort the rest of the run."
   (interactive "P")

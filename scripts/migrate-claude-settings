@@ -1,0 +1,489 @@
+#!/usr/bin/env python3
+"""Reviewable migration `sonnet-defaults-v1` for ~/.claude/settings.json.
+
+Preview by default. `--apply` publishes changes and requires
+`--expected-sha256` matching the reviewed preview's `expected_sha256`
+so a stale plan cannot be published. `--restore ID` uses the same
+preview-then-apply gate to roll back a specific migration and exposes
+its own `expected_sha256` for both the missing- and present-target
+cases so the docs never send `null` back through the CLI.
+
+Close Claude Code before applying or restoring. This tool never reads,
+writes, or refreshes any auth file, session cache, or plugin material;
+it only touches the settings file itself and a private backup
+directory. The identity/content recheck immediately before publication
+is a closed-app precondition, not a hostile multiwriter CAS: parent
+directories are trusted and cooperative and this is not an OS-level
+jail.
+
+Fixed migration semantics (no other fields are changed):
+  * `model` missing or exactly "opus[1m]" -> "sonnet"
+  * `modelSettings.claude-sonnet-5.effortLevel` missing -> "high"
+
+Every other field, including unknown model settings, custom model
+strings, and existing effort choices, is *semantically* preserved:
+the JSON is re-serialized with fixed formatting (two-space indent,
+trailing newline, insertion order) when changes are needed. A no-op
+preserves the original bytes and creates no backup. Explicit JSON `null`
+for `modelSettings`, the sonnet entry, or `effortLevel` is *ambiguous*
+data (neither "missing" nor a valid choice) and is rejected rather
+than silently overwritten. Non-finite JSON numbers (`NaN`, `Infinity`,
+`-Infinity`) are rejected.
+"""
+import argparse
+import errno
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import stat as statmod
+import sys
+import tempfile
+import time
+
+MIGRATION = "sonnet-defaults-v1"
+SETTINGS_RELATIVE = ".claude/settings.json"
+STATE_RELATIVE = ".local/state/tilde/claude-migrations"
+BACKUP_ID_RE = re.compile(r"\A" + re.escape(MIGRATION) + r"-\d{13,25}\Z")
+CHANGE_MODEL, KEEP_MODEL = "model:set-sonnet", "model:retain"
+CHANGE_EFFORT, KEEP_EFFORT = "effort:add-high", "effort:retain"
+FIELDS = ["model", "modelSettings.claude-sonnet-5.effortLevel"]
+_MAX_BYTES = 8 * 1024 * 1024
+
+
+class MigrationError(Exception):
+    """Raised with a redacted label; no user data enters the message."""
+
+
+def _sha256(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def _no_dupes(pairs):
+    seen = set()
+    for key, _ in pairs:
+        if key in seen:
+            raise MigrationError("settings:duplicate-key")
+        seen.add(key)
+    return dict(pairs)
+
+
+def _load(data, label="settings"):
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise MigrationError(label + ":not-utf8")
+
+    def _reject_nonfinite(_constant):
+        raise MigrationError(label + ":nonfinite-number")
+
+    def _finite_float(token):
+        value = float(token)
+        if not math.isfinite(value):
+            raise MigrationError(label + ":nonfinite-number")
+        return value
+
+    try:
+        parsed = json.loads(text, object_pairs_hook=_no_dupes,
+                            parse_constant=_reject_nonfinite,
+                            parse_float=_finite_float)
+    except MigrationError:
+        raise
+    except (ValueError, RecursionError):
+        raise MigrationError(label + ":malformed-json")
+    if not isinstance(parsed, dict):
+        raise MigrationError(label + ":not-object")
+    return parsed
+
+
+def _read_regular_bounded(path, label):
+    """Open the path atomically (no symlink follow), verify it is a
+    regular file via fstat, then bounded-read up to `_MAX_BYTES`.
+
+    Returns (bytes, os.stat_result) or None if the path does not exist.
+    Parent directories are cooperative; this is not an OS-jail claim.
+    """
+    try:
+        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        if getattr(error, "errno", None) == errno.ELOOP:
+            raise MigrationError(label + ":is-symlink")
+        raise MigrationError(label + ":open-failed")
+    try:
+        st = os.fstat(fd)
+        if not statmod.S_ISREG(st.st_mode):
+            raise MigrationError(label + ":not-regular-file")
+        chunks, remaining = [], _MAX_BYTES + 1
+        while remaining > 0:
+            try:
+                chunk = os.read(fd, min(65536, remaining))
+            except OSError:
+                raise MigrationError(label + ":read-failed")
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        if len(data) > _MAX_BYTES:
+            raise MigrationError(label + ":too-large")
+        return data, st
+    finally:
+        os.close(fd)
+
+
+def _regular_dir(path, label):
+    try:
+        st = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise MigrationError(label + ":stat-failed")
+    if statmod.S_ISLNK(st.st_mode):
+        raise MigrationError(label + ":is-symlink")
+    if not statmod.S_ISDIR(st.st_mode):
+        raise MigrationError(label + ":not-directory")
+    return st
+
+
+def _plan(parsed):
+    """Plan the fixed migration. Missing values are added; `null` is
+    rejected because it is ambiguous, neither missing nor a valid
+    choice, and silently overwriting it would destroy an author's
+    explicit `null`.
+    """
+    actions, new = [], dict(parsed)
+    if "model" not in new:
+        new["model"] = "sonnet"
+        actions.append(CHANGE_MODEL)
+    elif new["model"] is None:
+        raise MigrationError("settings:model-null")
+    elif new["model"] == "opus[1m]":
+        new["model"] = "sonnet"
+        actions.append(CHANGE_MODEL)
+    else:
+        actions.append(KEEP_MODEL)
+
+    if "modelSettings" not in new:
+        settings = {}
+    else:
+        raw_settings = new["modelSettings"]
+        if raw_settings is None:
+            raise MigrationError("settings:modelSettings-null")
+        if not isinstance(raw_settings, dict):
+            raise MigrationError("settings:modelSettings-not-object")
+        settings = dict(raw_settings)
+
+    if "claude-sonnet-5" not in settings:
+        settings["claude-sonnet-5"] = {"effortLevel": "high"}
+        actions.append(CHANGE_EFFORT)
+    else:
+        sonnet = settings["claude-sonnet-5"]
+        if sonnet is None:
+            raise MigrationError("settings:sonnet-null")
+        if not isinstance(sonnet, dict):
+            raise MigrationError("settings:sonnet-not-object")
+        sonnet = dict(sonnet)
+        if "effortLevel" not in sonnet:
+            sonnet["effortLevel"] = "high"
+            actions.append(CHANGE_EFFORT)
+        elif sonnet["effortLevel"] is None:
+            raise MigrationError("settings:effortLevel-null")
+        else:
+            actions.append(KEEP_EFFORT)
+        settings["claude-sonnet-5"] = sonnet
+
+    new["modelSettings"] = settings
+    return new, actions
+
+
+def _render(parsed):
+    # allow_nan=False so a caller cannot round-trip a smuggled float.
+    chunks, size = [], 1  # Reserve the trailing newline within the read limit.
+    try:
+        for text in json.JSONEncoder(indent=2, allow_nan=False).iterencode(parsed):
+            chunk = text.encode("utf-8")
+            size += len(chunk)
+            if size > _MAX_BYTES:
+                raise MigrationError("settings:too-large")
+            chunks.append(chunk)
+    except (ValueError, RecursionError):
+        raise MigrationError("settings:cannot-serialize")
+    return b"".join(chunks) + b"\n"
+
+
+def _changed(actions):
+    return CHANGE_MODEL in actions or CHANGE_EFFORT in actions
+
+
+def _report(current, actions, post, backup_id=None):
+    out = {
+        "migration": MIGRATION,
+        "actions": actions,
+        "changed": _changed(actions),
+        "current_sha256": _sha256(current),
+        "post_sha256": _sha256(post),
+        "expected_sha256": _sha256(current),
+        "fields": FIELDS,
+    }
+    if backup_id is not None:
+        out["backup_id"] = backup_id
+    return out
+
+
+def _publish_atomic(target, data, prior_state):
+    """Publish `data` to `target` atomically.
+
+    `prior_state` is either:
+      * None -> "no target expected"; publication uses `os.link` and
+        refuses to clobber a file that races into existence.
+      * (expected_sha, dev, ino, mtime_ns) -> "target must still be
+        exactly this bytes-and-identity"; publication rereads under
+        O_NOFOLLOW, verifies, then `os.replace`s.
+    """
+    parent = target.parent
+    fd, tmp_name = tempfile.mkstemp(prefix=".migrate-claude-", dir=str(parent))
+    tmp_path = Path(tmp_name)
+    try:
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(data)
+        except OSError:
+            raise MigrationError("publish:write-failed")
+        if prior_state is None:
+            try:
+                os.link(str(tmp_path), str(target))
+            except FileExistsError:
+                raise MigrationError("publish:target-appeared")
+            except OSError:
+                raise MigrationError("publish:link-failed")
+        else:
+            expected_sha, expected_dev, expected_ino, expected_mtime_ns = prior_state
+            recheck = _read_regular_bounded(target, "settings")
+            if recheck is None:
+                raise MigrationError("publish:target-vanished")
+            now_bytes, now_st = recheck
+            if _sha256(now_bytes) != expected_sha or (
+                now_st.st_dev, now_st.st_ino, now_st.st_mtime_ns) != (
+                    expected_dev, expected_ino, expected_mtime_ns):
+                raise MigrationError("publish:target-changed")
+            try:
+                os.replace(str(tmp_path), str(target))
+            except OSError:
+                raise MigrationError("publish:replace-failed")
+    finally:
+        try:
+            os.unlink(str(tmp_path))
+        except FileNotFoundError:
+            pass
+
+
+def _write_backup(state_root, backup_id, original, metadata):
+    """Create the backup directory (0700) and write two 0600 files.
+    A chmod failure is treated as a hard failure; a backup that is not
+    private is not a backup we are willing to accept.
+    """
+    _regular_dir(state_root, "state")
+    state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        os.chmod(str(state_root), 0o700)
+    except OSError:
+        raise MigrationError("backup:chmod-failed")
+    directory = state_root / backup_id
+    if directory.exists():
+        raise MigrationError("backup:id-collision")
+    directory.mkdir(mode=0o700)
+    try:
+        os.chmod(str(directory), 0o700)
+    except OSError:
+        raise MigrationError("backup:chmod-failed")
+    metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True,
+                                 allow_nan=False) + "\n").encode("utf-8")
+    for name, data in (("original-bytes", original),
+                       ("metadata.json", metadata_bytes)):
+        fd = os.open(str(directory / name),
+                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(data)
+        except OSError:
+            raise MigrationError("backup:write-failed")
+
+
+def _read_target(path):
+    """Public reader that raises `settings:missing` instead of
+    returning None, for callers that require the file to exist.
+    """
+    read = _read_regular_bounded(path, "settings")
+    if read is None:
+        raise MigrationError("settings:missing")
+    return read
+
+
+def preview(home):
+    target = home / SETTINGS_RELATIVE
+    current, _ = _read_target(target)
+    parsed = _load(current)
+    new, actions = _plan(parsed)
+    post = current if not _changed(actions) else _render(new)
+    return _report(current, actions, post)
+
+
+def apply(home, expected_sha256):
+    target = home / SETTINGS_RELATIVE
+    current, before = _read_target(target)
+    if _sha256(current) != expected_sha256:
+        raise MigrationError("apply:stale-preview")
+    parsed = _load(current)
+    new, actions = _plan(parsed)
+    if not _changed(actions):
+        return _report(current, actions, current)
+    post = _render(new)
+    backup_id = "%s-%d" % (MIGRATION, time.time_ns())
+    metadata = {
+        "migration": MIGRATION,
+        "backup_id": backup_id,
+        "timestamp_ns": int(backup_id.rsplit("-", 1)[1]),
+        "original_sha256": _sha256(current),
+        "post_sha256": _sha256(post),
+        "actions": actions,
+    }
+    _write_backup(home / STATE_RELATIVE, backup_id, current, metadata)
+    _publish_atomic(target, post, prior_state=(
+        _sha256(current), before.st_dev, before.st_ino, before.st_mtime_ns))
+    return _report(current, actions, post, backup_id=backup_id)
+
+
+def _load_backup(state_root, backup_id):
+    """Validate the backup directory and recompute every hash from the
+    stored original bytes; the stored `metadata.json` is only used to
+    detect corruption, never as a source of truth for what to return.
+    """
+    _regular_dir(state_root, "state")
+    if not isinstance(backup_id, str) or not BACKUP_ID_RE.fullmatch(backup_id):
+        raise MigrationError("restore:invalid-id")
+    directory = state_root / backup_id
+    if _regular_dir(directory, "backup") is None:
+        raise MigrationError("restore:missing-backup")
+    original_read = _read_regular_bounded(directory / "original-bytes", "backup")
+    metadata_read = _read_regular_bounded(directory / "metadata.json", "backup")
+    if original_read is None or metadata_read is None:
+        raise MigrationError("restore:missing-backup")
+    original, _ = original_read
+    metadata_bytes, _ = metadata_read
+    metadata = _load(metadata_bytes, label="backup")
+    if metadata.get("migration") != MIGRATION:
+        raise MigrationError("restore:metadata-mismatch")
+    if metadata.get("backup_id") != backup_id:
+        raise MigrationError("restore:metadata-mismatch")
+    computed_original = _sha256(original)
+    if metadata.get("original_sha256") != computed_original:
+        raise MigrationError("restore:backup-corrupted")
+    # Recompute the post-migration bytes from the stored original with
+    # the fixed migration and compare against metadata. This is why the
+    # public output only echoes the recomputed hashes; nothing from
+    # `metadata.json` is ever propagated verbatim into the report.
+    parsed = _load(original)
+    new, actions = _plan(parsed)
+    computed_post = original if not _changed(actions) else _render(new)
+    if metadata.get("post_sha256") != _sha256(computed_post):
+        raise MigrationError("restore:backup-corrupted")
+    if metadata.get("actions") != actions:
+        raise MigrationError("restore:metadata-mismatch")
+    return original, {"original_sha256": computed_original,
+                      "post_sha256": _sha256(computed_post)}
+
+
+def restore_preview(home, backup_id):
+    original, computed = _load_backup(home / STATE_RELATIVE, backup_id)
+    target = home / SETTINGS_RELATIVE
+    read = _read_regular_bounded(target, "settings")
+    if read is None:
+        # Missing-target case: apply-side expects the *original* hash so
+        # the CLI has a real 64-hex string to paste back, not `null`.
+        return {"migration": MIGRATION, "backup_id": backup_id,
+                "current_sha256": None,
+                "expected_sha256": computed["original_sha256"],
+                "post_sha256": computed["post_sha256"],
+                "original_sha256": computed["original_sha256"],
+                "target_present": False}
+    current, _ = read
+    current_sha = _sha256(current)
+    if current_sha != computed["post_sha256"]:
+        raise MigrationError("restore:target-diverged")
+    return {"migration": MIGRATION, "backup_id": backup_id,
+            "current_sha256": current_sha,
+            "expected_sha256": current_sha,
+            "post_sha256": computed["post_sha256"],
+            "original_sha256": computed["original_sha256"],
+            "target_present": True}
+
+
+def restore_apply(home, backup_id, expected_sha256):
+    original, computed = _load_backup(home / STATE_RELATIVE, backup_id)
+    target = home / SETTINGS_RELATIVE
+    read = _read_regular_bounded(target, "settings")
+    if read is None:
+        if expected_sha256 != computed["original_sha256"]:
+            raise MigrationError("apply:stale-preview")
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        # Missing-target publication MUST NOT clobber a file created
+        # concurrently by the app.
+        _publish_atomic(target, original, prior_state=None)
+        return {"migration": MIGRATION, "backup_id": backup_id, "restored": True,
+                "current_sha256": _sha256(original)}
+    current, before = read
+    if _sha256(current) != computed["post_sha256"]:
+        raise MigrationError("restore:target-diverged")
+    if expected_sha256 != _sha256(current):
+        raise MigrationError("apply:stale-preview")
+    _publish_atomic(target, original, prior_state=(
+        _sha256(current), before.st_dev, before.st_ino, before.st_mtime_ns))
+    return {"migration": MIGRATION, "backup_id": backup_id, "restored": True,
+            "current_sha256": _sha256(original)}
+
+
+def _resolve_home(argument):
+    if argument is not None and not argument:
+        raise MigrationError("home:invalid")
+    home = Path(argument) if argument is not None else Path.home()
+    if not home.is_absolute() or home == Path("/"):
+        raise MigrationError("home:invalid")
+    return home
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Reviewable Claude settings migration.")
+    parser.add_argument("--apply", action="store_true", help="publish; requires --expected-sha256")
+    parser.add_argument("--expected-sha256", help="required with --apply; must match preview")
+    parser.add_argument("--restore", metavar="ID", help="preview or apply a specific backup ID")
+    parser.add_argument("--home", help="absolute HOME override for fixture runs; not a sandbox")
+    args = parser.parse_args(argv)
+    try:
+        home = _resolve_home(args.home)
+        if args.apply and not args.expected_sha256:
+            raise MigrationError("apply:missing-expected-sha256")
+        if args.restore is not None:
+            report = (restore_apply(home, args.restore, args.expected_sha256)
+                      if args.apply else restore_preview(home, args.restore))
+        else:
+            report = apply(home, args.expected_sha256) if args.apply else preview(home)
+        print(json.dumps(report, sort_keys=True))
+        return 0
+    except MigrationError as error:
+        sys.stderr.write("migrate-claude-settings: " + str(error) + "\n")
+        return 2
+    except OSError:
+        # Fixed label, never a raw traceback or any path/errno string
+        # that could leak content from the user's HOME.
+        sys.stderr.write("migrate-claude-settings: io:unrecoverable\n")
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

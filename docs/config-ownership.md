@@ -25,6 +25,14 @@ not application data, credentials, package installations, or local preferences.
 | API credentials and signing keys | 1Password | Inject at point of use | Never seed or copy secret values from this repository |
 | `.context/`, agent sessions and logs | Running tools | Ignored local state | Disposable unless a separate retention policy says otherwise |
 
+## Reviewed upgrades and recovery
+
+See [upgrades-and-recovery.md](upgrades-and-recovery.md) for the per-owner
+rollback workflows: Claude settings migration, private ELPA snapshot and
+restore, Neovim `lazy-lock.json` restore, and the limits of each. Source
+configuration, mutable local state, and installation are separate owners
+and roll back independently.
+
 ## Claude settings migration
 
 `claude/.stow-local-ignore` excludes the tracked settings template. After
@@ -44,3 +52,12 @@ To change an existing machine's defaults, review the local/template difference
 and apply a specific migration. Never copy the whole template over local state.
 Older revisions may expect a settings symlink. Preserve local settings before
 rolling back across this ownership change.
+
+The only reviewed migration provided today is `sonnet-defaults-v1`
+(`scripts/migrate-claude-settings`). Close Claude Code first, run
+`make migrate-claude` for a preview, and apply with the printed
+`current_sha256` under `--expected-sha256`. Restore uses the printed
+backup ID; both preview and apply forms are required. See
+[upgrades-and-recovery.md](upgrades-and-recovery.md) for the full
+workflow and the limits (no `--force`, symlink refusal, private
+backups, closed-app precondition).

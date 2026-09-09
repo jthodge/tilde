@@ -76,6 +76,14 @@ round trips, and whether a workflow reduces daily friction. Do not infer these
 from unit-test success. See [Emacs](emacs-workflow.md),
 [terminal](terminal-workflow.md), and [shell](shell-startup.md) workflow notes.
 
+Reviewed upgrades and recovery are deliberately outside CI: they mutate
+installed artifacts on a live machine and require a closed application.
+See [upgrades-and-recovery.md](upgrades-and-recovery.md) for the
+Claude settings migration, private ELPA snapshot/restore, and Neovim
+`lazy-lock.json` restore workflows. The automated suite exercises the
+documented shell blocks against a synthetic temp HOME; it never runs a
+package upgrade or reads the live Claude settings.
+
 Stage new sources before the final verification pass: tracked-file syntax
 checks intentionally exclude ignored local configuration and application state.
 Tests do not authorize a commit or a push; follow the repository's Git policy.

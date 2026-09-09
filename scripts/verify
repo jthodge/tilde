@@ -41,7 +41,7 @@ def lint():
             json.loads(path.read_text())
         elif path.suffix in (".yml", ".yaml"):
             run("ruby", "-e", "require 'yaml'; YAML.load_file(ARGV[0])", str(path))
-        elif path.suffix == ".py" or relative in ("scripts/doctor", "scripts/seed-configs", "scripts/verify", "scripts/check-capabilities"):
+        elif path.suffix == ".py" or relative in ("scripts/doctor", "scripts/seed-configs", "scripts/verify", "scripts/check-capabilities", "scripts/migrate-claude-settings"):
             compile(path.read_text(), str(path), "exec")
         elif path.suffix == ".fish":
             run("fish", "--no-config", "--no-execute", str(path))
@@ -62,7 +62,7 @@ def typecheck():
     require("pyright")
     run("pyright", "--pythonpath", sys.executable, "--pythonversion", "3.9", "--level", "error",
         "scripts/doctor", "scripts/seed-configs", "scripts/verify",
-        "scripts/check-capabilities", "scripts/tests")
+        "scripts/check-capabilities", "scripts/migrate-claude-settings", "scripts/tests")
 
 
 def test():
