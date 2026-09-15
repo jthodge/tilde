@@ -55,6 +55,7 @@ class CheckTest(unittest.TestCase):
         self.home.mkdir()
 
         _git(self.root, "init", "-q", "-b", "main")
+        (self.root / ".home-manager-packages").write_text("")
 
     # -- fixture helpers ----------------------------------------------
 
@@ -250,6 +251,41 @@ class CheckTest(unittest.TestCase):
         result = self._run("../etc")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("malformed package name", result.stderr)
+
+    def test_home_manager_bridge_is_checked(self) -> None:
+        self._seed({
+            ".stow-packages": "",
+            ".home-manager-packages": "ghostty\n",
+            "ghostty/.config/ghostty/config": "# ghostty\n",
+        })
+
+        # Model an intermediate Home Manager link without installing Nix.
+        bridge = self.tmp / "ghostty-bridge"
+        bridge.symlink_to(self.root / "ghostty/.config/ghostty/config")
+        self._link(".config/ghostty/config", bridge)
+
+        result = self._run()
+        self.assertEqual(
+            result.returncode, 0, msg=result.stderr + result.stdout
+        )
+        self.assertIn("OK: 1 tracked deployment entries", result.stdout)
+
+    def test_package_cannot_have_two_deployment_owners(self) -> None:
+        self._seed({
+            ".stow-packages": "ghostty\n",
+            ".home-manager-packages": "ghostty\n",
+            "ghostty/.config/ghostty/config": "# ghostty\n",
+        })
+        self._link(
+            ".config/ghostty/config",
+            self.root / "ghostty/.config/ghostty/config",
+        )
+
+        for args in ((), ("ghostty",)):
+            with self.subTest(args=args):
+                result = self._run(*args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("multiple owners", result.stderr)
 
 
 if __name__ == "__main__":

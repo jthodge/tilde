@@ -1,8 +1,9 @@
-# Makefile for this stow-managed dotfiles repo.
+# Makefile for Stow deployment and shared dotfiles verification.
 #
-# `make` alone is safe: it simulates the deployment and writes nothing.
-# `make switch` applies it. `make check` compares the live $HOME
-# against this checkout and reports drift.
+# `make` alone is safe: it simulates Stow deployment and writes nothing.
+# `make switch` deploys .stow-packages, not Home Manager configuration.
+# `make check` compares both deployment manifests against the live $HOME.
+# See docs/nix-migration.md for Home Manager activation.
 
 SHELL := bash
 
@@ -22,22 +23,22 @@ PYRIGHT_VERSION := 1.1.403
 .PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools capabilities migrate-claude
 
 help: ## Show this help
-	@echo "Packages: $(PACKAGES)"
+	@echo "Stow packages: $(PACKAGES)"
 	@echo
 	@echo "Targets:"
 	@grep -hE '^[a-zA-Z_-]+:.*?$(HASH)$(HASH) .*$$' $(MAKEFILE_LIST) \
 		| sort \
 		| awk 'BEGIN {FS = ":.*?$(HASH)$(HASH) "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
-dry-run: ## Simulate the deployment, write nothing (default)
+dry-run: ## Simulate Stow deployment and seeding, write nothing (default)
 	stow --simulate --verbose --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
 	@python3 scripts/seed-configs
 
-switch: ## Deploy every package; repeat as often as you like
+switch: ## Deploy .stow-packages and seed configs, not Home Manager
 	stow --restow --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
 	@python3 scripts/seed-configs --apply
 
-unstow: ## Remove every link that stow deployed
+unstow: ## Remove links for .stow-packages; leave Home Manager and seeds
 	stow --delete --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
 
 check: ## Compare the live $HOME against this checkout

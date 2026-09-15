@@ -12,9 +12,14 @@ TMUX = shutil.which("tmux")
 
 class TerminalConfigTest(unittest.TestCase):
     def test_ghostty_is_the_only_declared_terminal(self):
-        packages = (ROOT / ".stow-packages").read_text().splitlines()
+        packages = [
+            line.strip()
+            for manifest in (".stow-packages", ".home-manager-packages")
+            for line in (ROOT / manifest).read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
         brewfile = (ROOT / "Brewfile").read_text().splitlines()
-        self.assertIn("ghostty", packages)
+        self.assertEqual(packages.count("ghostty"), 1)
         self.assertIn('cask "ghostty"', brewfile)
         for retired in ("alacritty", "iterm2"):
             self.assertNotIn(retired, packages)

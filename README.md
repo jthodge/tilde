@@ -1,6 +1,8 @@
 # tilde
 
-Personal macOS dotfiles, deployed via [GNU Stow][stow].
+Personal macOS dotfiles, migrating from [GNU Stow][stow] to Home Manager.
+Ghostty configuration is Home Manager-owned; remaining packages still use Stow.
+See the [current migration checkpoint and recovery](docs/nix-migration.md).
 
 ## Prerequisites (manual, one-time)
 
@@ -46,9 +48,16 @@ cd ~/tilde
 make brew         # install the Homebrew packages the Brewfile declares
 scripts/setup-tools --check   # report toolchain plan, mutate nothing
 make tools        # explicit: bootstrap Volta node/pnpm/yarn if absent
-make              # = make dry-run: simulate the deployment, write nothing
-make switch       # deploy every package; resolve conflicts before proceeding
+make              # = make dry-run: simulate Stow deployment, write nothing
+make switch       # deploy .stow-packages only; resolve conflicts first
 make plugins      # explicit: init submodules + install TPM plugins
+```
+
+Next, explicitly install Determinate Nix if needed, then follow the
+[Home Manager build, preview, and activation procedure](docs/nix-migration.md).
+`make switch` does not deploy Ghostty configuration. After activation:
+
+```sh
 make doctor       # JSON report on stdout, human summary on stderr
 make check        # verify the live $HOME against this checkout
 ```
@@ -60,10 +69,11 @@ software and require an explicit invocation. No default target chains
 into them. `make tools` preserves existing Volta defaults and only
 creates `~/.venv/base` if absent.
 
-Each entry in `.stow-packages` mirrors a slice of `$HOME`; the
-file is the canonical list and every `make` target feeds it to
-`stow` verbatim. The `scripts/` directory is intentionally not
-stowed — its contents are invoked in place.
+Each entry in `.stow-packages` mirrors a slice of `$HOME`; it is the
+canonical list for Stow deployment targets. `.home-manager-packages` records
+packages transferred to Home Manager's out-of-store bridge; `home.nix` defines
+their links. A package must not appear in both lists. The `scripts/` directory
+is intentionally not deployed — its contents are invoked in place.
 
 > **No clean-machine validation.** This repo is not tested against
 > a fresh macOS install end-to-end. The list above is the proposed
@@ -78,12 +88,15 @@ Three diagnostics answer different questions:
   match its ownership rules?** Checks repository-owned links and
   seed-only app-owned files. See [configuration ownership](docs/config-ownership.md).
   It reports:
-  - `MISSING` — the package is not stowed.
+  - `MISSING` — the expected target is absent.
   - `DRIFT` — the target exists but resolves elsewhere. An
     application replaced a repository-owned link with a real file,
     or a seed-only file has the wrong ownership.
-  - `UNDECLARED` — a tracked directory that `.stow-packages`
-    omits, so a fresh bootstrap would skip it.
+  - `UNDECLARED` — a package-like tracked directory absent from both
+    deployment manifests, so a fresh bootstrap would skip it.
+  Duplicate declarations fail. For linked files, this checks resolved source
+  identity, not which manager created the link; inspect the Home Manager
+  generation and link chain separately.
 - `make doctor` (`scripts/doctor`) — **does the surrounding
   environment satisfy the prerequisites?** Emits a JSON report on
   stdout and a short human summary on stderr. Reports required
@@ -114,8 +127,10 @@ make smoke        # optional full-init Emacs check with installed packages
 See [verification scope and limitations](docs/verification.md),
 [shell startup](docs/shell-startup.md), [Emacs workflow](docs/emacs-workflow.md),
 and [terminal workflow](docs/terminal-workflow.md).
-[Adoption decisions and open checks](docs/adoption-decisions.md) records why
-Stow and the existing personal tools remain in place. See
+[Adoption decisions and open checks](docs/adoption-decisions.md) records the
+earlier audit rationale. The [Nix migration](docs/nix-migration.md) supersedes
+its decision to retain Stow as the long-term deployment mechanism, while
+preserving current application and runtime ownership. See
 [reviewed upgrades and recovery](docs/upgrades-and-recovery.md) before changing
 installed packages or migrating seed-only local settings.
 

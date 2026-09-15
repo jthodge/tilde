@@ -6,7 +6,7 @@ Run from the repository root:
 make test-tools  # explicit installation: ShellCheck and pinned Pyright via uv
 make verify      # lint -> typecheck -> tests; never installs tools or packages
 make smoke       # separate offline Emacs init check, needs installed packages
-make check       # validate the actual Stow deployment
+make check       # validate Stow and Home Manager bridge source paths
 make doctor      # read-only host/tool inventory
 ```
 
@@ -43,7 +43,9 @@ Python and its possibly unsupported syntax.
 - **Git and deployment:** scanner tests inspect staged blobs, including binary
   data and type changes, without printing synthetic matches. Baseline fixtures
   use tree/index objects, not commits. Checker tests cover ownership, missing
-  dependencies, malformed manifests, and Git/path inspection failures.
+  dependencies, malformed manifests, and Git/path inspection failures. Bridge
+  tests check resolved source identity and reject duplicate deployment owners;
+  they do not run Home Manager or prove the provenance of live links.
 - **Policy:** targeted text checks prevent known signing/publication conflicts.
   They do not prove that an agent will obey prose or that heuristic permission
   guards are a sandbox. Extension boundaries and their documented limits are
@@ -69,6 +71,10 @@ an explicit CI preparation step. The runner image/Homebrew packages are not
 fully pinned, so this is reproducible test *procedure*, not a hermetic build.
 
 ## Still manual
+
+Nix evaluation/builds and live Home Manager activation are not part of
+`make verify`. Follow the separate [migration verification](nix-migration.md)
+for artifact inspection, dry-run, link ownership, and application behavior.
 
 Fresh-machine macOS bootstrap, 1Password and accessibility prompts, actual
 LSP/GUI completion round trips, visual editor interactions, remote clipboard

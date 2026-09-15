@@ -5,7 +5,9 @@ not application data, credentials, package installations, or local preferences.
 
 | Target | Owner | Deployment | Runtime writes and recovery |
 | --- | --- | --- | --- |
-| Shell, Git, terminal and tmux config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| Shell, Git and tmux config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| Ghostty config | Repository | Home Manager out-of-store bridge | Edit the checkout source; generation rollback does not restore its contents |
+| Home Manager demonstration file and housekeeping | Home Manager | Generation activation | Inspect the generation and its dedicated file/application/font targets |
 | Shared agent instructions and skills | Repository | Stow links | Edit the canonical source; restart sessions to load it |
 | `~/.claude/settings.json` | Claude | Seed once, regular local file | Preserve local model, plugin and permission choices; template changes do not update existing files |
 | `~/.claude/settings.local.json` | Local user / Claude | Unmanaged | Never publish local permissions or credentials |
@@ -26,6 +28,10 @@ not application data, credentials, package installations, or local preferences.
 | `.context/`, agent sessions and logs | Running tools | Ignored local state | Disposable unless a separate retention policy says otherwise |
 
 ## Reviewed upgrades and recovery
+
+See [the macOS Nix migration](nix-migration.md) for the current split between
+Stow and Home Manager, the Ghostty handoff, and recovery across that boundary.
+Ghostty and Fish executables remain Homebrew-owned; Determinate owns Nix.
 
 See [upgrades-and-recovery.md](upgrades-and-recovery.md) for the per-owner
 rollback workflows: Claude settings migration, private ELPA snapshot and
