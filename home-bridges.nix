@@ -15,6 +15,9 @@ let
 
     # codex: config.toml, authentication, and sessions remain unmanaged.
     ".codex/AGENTS.md" = "codex/.codex/AGENTS.md";
+
+    # emacs: retain ignored packages, caches, and Custom state in place.
+    ".emacs.d" = "emacs/.emacs.d";
   };
 in
 {

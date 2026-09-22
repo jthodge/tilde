@@ -4,6 +4,7 @@ bash
 bin
 claude
 codex
+emacs
 ghostty
 ssh
 zsh

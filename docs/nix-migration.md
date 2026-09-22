@@ -159,6 +159,7 @@ replaced by per-file declarations while writers are active.
 | agents | `.agents` | Same directory inode and source paths; regression suite |
 | claude | `CLAUDE.md`, commands directory | Local settings remain regular and untouched; seeding still runs through `make switch` |
 | codex | `.codex/AGENTS.md` | Same canonical preferences; config, authentication, and sessions unmanaged |
+| emacs | `.emacs.d` | Same directory inode and tracked sources; 58 ERT tests and fresh-home smoke; no editor restart or state relocation |
 
 ## Bin and SSH handoff
 
