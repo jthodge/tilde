@@ -163,6 +163,7 @@ replaced by per-file declarations while writers are active.
 | git | `.gitconfig`, ignore file, hooks directory | Same source hashes and signing trust; unrelated hook edits excluded from the migration commit |
 | nvim | `.config/nvim` | Same directory inode and lockfile; headless regression checks; no live plugin updates |
 | pi | Ten existing file/directory links under `.pi/agent` | Same source identities, real parent retained, auth and sessions excluded; extension regression tests |
+| tmux | `.tmux.conf`, `.tmux` | Same config and plugin directory; isolated tmux regression tests; no live reload or plugin installation |
 
 ## Bin and SSH handoff
 

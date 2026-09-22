@@ -5,7 +5,8 @@ not application data, credentials, package installations, or local preferences.
 
 | Target | Owner | Deployment | Runtime writes and recovery |
 | --- | --- | --- | --- |
-| Fish and tmux config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| Fish config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| tmux config and plugin directory | Repository / TPM | Home Manager out-of-store bridges | Preserve directory identity, plugin ownership, and active sessions |
 | Git config, ignore file, and hooks | Repository | Home Manager out-of-store bridges | Preserve hook contents and 1Password signing; local hook edits remain separate changes |
 | Bash and Zsh config | Repository | Home Manager out-of-store bridge | Edit checkout sources; executable ownership and source contents are unchanged |
 | Ghostty config | Repository | Home Manager out-of-store bridge | Edit the checkout source; generation rollback does not restore its contents |
@@ -29,7 +30,7 @@ not application data, credentials, package installations, or local preferences.
 | fish prompt sources | Repository | Stow links | Fish-native prompt and SSH-color helper copied from Mark Tran; Git settings live in `colors.fish`, with no prompt plugin |
 | fish universal variables and `local.fish` | fish / local user | Ignored local state | Do not make bootstrap depend on undeclared universal variables |
 | TPM | Git submodule | Explicit `make plugins` | Restore the submodule revision, then install declared plugins |
-| TPM plugin checkouts | TPM | Ignored runtime installs | `make plugins` installs them; updates are separate from Stow |
+| TPM plugin checkouts | TPM | Ignored runtime installs | `make plugins` installs them; updates are separate from configuration deployment |
 | Node, pnpm and yarn | Volta | Explicit `make tools` | Manifest supplies defaults only when absent; existing versions are preserved |
 | Python installations and environments | uv / project | Explicit setup | Project files own project dependencies; base environment is optional convenience |
 | API credentials and signing keys | 1Password | Inject at point of use | Never seed or copy secret values from this repository |

@@ -38,6 +38,10 @@ let
     ".pi/agent/settings.json" = "pi/.pi/agent/settings.json";
     ".pi/agent/skills" = "pi/.pi/agent/skills";
     ".pi/agent/themes" = "pi/.pi/agent/themes";
+
+    # tmux: retain TPM and ignored plugin checkouts without reloading sessions.
+    ".tmux.conf" = "tmux/.tmux.conf";
+    ".tmux" = "tmux/.tmux";
   };
 in
 {
