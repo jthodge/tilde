@@ -16,6 +16,7 @@ not application data, credentials, package installations, or local preferences.
 | Claude instructions and slash commands | Repository | Home Manager out-of-store bridges | Preserve the real `.claude` parent and app-owned settings |
 | `~/.claude/settings.json` | Claude | Seed once, regular local file | Preserve local model, plugin and permission choices; template changes do not update existing files |
 | `~/.claude/settings.local.json` | Local user / Claude | Unmanaged | Never publish local permissions or credentials |
+| Codex instruction alias | Repository | Home Manager out-of-store bridge | Same canonical shared preferences; preserve the real `.codex` parent |
 | `~/.codex/config.toml` | Codex | Unmanaged | Keep local choices; no gateway or mentor-specific defaults are imposed |
 | `~/.pi/agent/settings.json` | Repository and Pi | Intentional writable link | Review saved preferences/package changes in Git; keep credentials and sessions outside Git |
 | Pi extension and theme sources | Repository | Stow links | Treat as maintained code; test changes before a new session |

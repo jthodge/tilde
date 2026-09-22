@@ -3,6 +3,7 @@ agents
 bash
 bin
 claude
+codex
 ghostty
 ssh
 zsh

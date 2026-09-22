@@ -12,6 +12,9 @@ let
     # claude: settings.json remains a seed-only, app-owned regular file.
     ".claude/CLAUDE.md" = "claude/.claude/CLAUDE.md";
     ".claude/commands" = "claude/.claude/commands";
+
+    # codex: config.toml, authentication, and sessions remain unmanaged.
+    ".codex/AGENTS.md" = "codex/.codex/AGENTS.md";
   };
 in
 {
