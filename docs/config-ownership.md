@@ -8,6 +8,9 @@ not application data, credentials, package installations, or local preferences.
 | Fish, Git and tmux config | Repository | Stow links | Edit the repository; use Git to restore intended content |
 | Bash and Zsh config | Repository | Home Manager out-of-store bridge | Edit checkout sources; executable ownership and source contents are unchanged |
 | Ghostty config | Repository | Home Manager out-of-store bridge | Edit the checkout source; generation rollback does not restore its contents |
+| `~/.local/bin/uv-python-simlink` | Repository | Home Manager out-of-store bridge | Preserve executable source permissions; deployment does not run the helper |
+| SSH config and public `allowed_signers` | Repository | Home Manager out-of-store bridge | Preserve source bytes and private parent-directory permissions; no key generation |
+| SSH known hosts and local includes | SSH / local tools | Unmanaged | Keep Conductor's included config local; do not copy whole SSH directories into Nix |
 | Home Manager demonstration file and housekeeping | Home Manager | Generation activation | Inspect the generation and its dedicated file/application/font targets |
 | Shared agent instructions and skills | Repository | Stow links | Edit the canonical source; restart sessions to load it |
 | `~/.claude/settings.json` | Claude | Seed once, regular local file | Preserve local model, plugin and permission choices; template changes do not update existing files |
@@ -31,8 +34,8 @@ not application data, credentials, package installations, or local preferences.
 ## Reviewed upgrades and recovery
 
 See [the macOS Nix migration](nix-migration.md) for the current split between
-Stow and Home Manager, the Ghostty and Bash/Zsh handoffs, and recovery across
-those boundaries. Ghostty and Fish executables remain Homebrew-owned;
+Stow and Home Manager, the Ghostty, Bash/Zsh, and bin/SSH handoffs, and recovery
+across those boundaries. Ghostty and Fish executables remain Homebrew-owned;
 Bash/Zsh executable ownership is unchanged. Determinate owns Nix.
 
 See [upgrades-and-recovery.md](upgrades-and-recovery.md) for the per-owner

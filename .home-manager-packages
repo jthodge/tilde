@@ -1,4 +1,6 @@
 # Checkout-layout packages transferred to Home Manager's out-of-store bridge.
 bash
+bin
 ghostty
+ssh
 zsh

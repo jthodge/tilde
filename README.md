@@ -1,8 +1,8 @@
 # tilde
 
 Personal macOS dotfiles, migrating from [GNU Stow][stow] to Home Manager.
-Ghostty, Bash, and Zsh configuration is Home Manager-owned; remaining packages
-still use Stow.
+Home Manager deploys the packages listed in `.home-manager-packages`; the
+remaining packages still use Stow.
 See the [current migration checkpoint and recovery](docs/nix-migration.md).
 
 ## Prerequisites (manual, one-time)
@@ -56,7 +56,7 @@ make plugins      # explicit: init submodules + install TPM plugins
 
 Next, explicitly install Determinate Nix if needed, then follow the
 [Home Manager build, preview, and activation procedure](docs/nix-migration.md).
-`make switch` does not deploy Ghostty, Bash, or Zsh configuration. After activation:
+`make switch` does not deploy the Home Manager packages. After activation:
 
 ```sh
 make doctor       # JSON report on stdout, human summary on stderr

@@ -1,6 +1,9 @@
 # macOS Nix migration
 
-## Current checkpoint: Ghostty, Bash, and Zsh bridges
+## Current checkpoint: five packages bridged
+
+Home Manager owns `bash`, `bin`, `ghostty`, `ssh`, and `zsh`. Nine packages
+remain Stow-owned, including the deferred Fish handoff.
 
 This is an incremental, behavior-preserving migration, not an application or
 runtime redesign. The current flake targets Apple Silicon macOS
@@ -12,6 +15,7 @@ Fresh-machine bootstrap has not been validated end-to-end.
 | Packages in `.stow-packages` | Stow, through `make switch` |
 | Ghostty configuration | Standalone Home Manager, through `home.nix` |
 | Bash and Zsh configuration | Standalone Home Manager, through `home-shells.nix` |
+| Bin helper and SSH config/public signers | Standalone Home Manager, through `home-files.nix` |
 | Ghostty and Fish executables | Homebrew |
 | Node, pnpm, Yarn | Volta |
 | Python installations and environments | uv / project |
@@ -108,8 +112,39 @@ idempotence does not mean no commands execute.
 
 `make switch` only restows the remaining Stow packages and applies seed-only
 configuration. It does **not** build or activate Home Manager. On a fresh home,
-Ghostty, Bash, and Zsh configuration will be missing from `make check` until
+targets from `.home-manager-packages` will be missing from `make check` until
 Home Manager activation.
+
+## Bin and SSH handoff
+
+`home-files.nix` declares only `.local/bin/uv-python-simlink`, `.ssh/config`,
+and `.ssh/allowed_signers`. All three were direct file symlinks, so the same
+reviewed replacement procedure as Bash/Zsh applies: transfer `bin` and `ssh`
+between manifests, preview activation, then activate and verify each link.
+Do not unlink or replace `.local/bin` or `.ssh` themselves.
+
+The helper remains executable through its source link. Its behavior is tested
+with fake uv installations; do not run it against live Python installations
+merely to check deployment. The SSH change does not generate configuration or
+keys. Preserve `.ssh` mode `0700`; private keys, known hosts, and Conductor's
+included config stay local and outside the managed-file declarations.
+`git verify-commit HEAD` checks that the public signing trust file still works
+without accessing private signing keys or opening a network connection.
+
+The pre-handoff checkpoint is commit `eaf494b`, with generation
+`/nix/store/4vmy3wpbiqaw3v8hr76ncrd0q93i2b8n-home-manager-generation`.
+The reviewed bin/SSH generation is
+`/nix/store/x0z5pgn9y5b2gw8azkk0wqj9x2jl16ix-home-manager-generation`.
+
+For recovery across this checkpoint, preview and activate the reviewed prior
+configuration, checking that it releases only these three new links plus
+expected housekeeping updates. Return `bin` and `ssh` to Stow's manifest and
+remove them from Home Manager's manifest. Preview
+`stow --simulate --verbose --dir . --target "$HOME" bin ssh`, and only apply
+without `--simulate` when its scope is correct and there are no conflicts.
+Recheck source hashes, executable access, SSH directory permissions, commit
+signature verification, and `make check`. Preserve declarations from later
+migrations when rebuilding a package-specific rollback configuration.
 
 ## Bash and Zsh handoff
 
@@ -217,6 +252,10 @@ The Ghostty checkpoint passed `make verify`, all 148 live deployment entries,
 The Bash/Zsh handoff also verified all five Home Manager link targets, unchanged
 source hashes, repeated activation, and the existing isolated shell regression
 suite. It did not require restarting Fish or its running jobs.
+The bin/SSH handoff verified the three link targets, unchanged source hashes,
+helper executable access, preserved parent directories and permissions, commit
+signature verification, and repeated activation. No live helper execution or
+SSH connection was used as a deployment test.
 `make verify` does not build Nix or exercise live Home Manager activation.
 Checker tests cover bridge source resolution and duplicate ownership, not the
 Home Manager activation engine or a fresh macOS bootstrap.
