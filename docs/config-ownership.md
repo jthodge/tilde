@@ -5,7 +5,8 @@ not application data, credentials, package installations, or local preferences.
 
 | Target | Owner | Deployment | Runtime writes and recovery |
 | --- | --- | --- | --- |
-| Fish, Git and tmux config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| Fish and tmux config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| Git config, ignore file, and hooks | Repository | Home Manager out-of-store bridges | Preserve hook contents and 1Password signing; local hook edits remain separate changes |
 | Bash and Zsh config | Repository | Home Manager out-of-store bridge | Edit checkout sources; executable ownership and source contents are unchanged |
 | Ghostty config | Repository | Home Manager out-of-store bridge | Edit the checkout source; generation rollback does not restore its contents |
 | `~/.local/bin/uv-python-simlink` | Repository | Home Manager out-of-store bridge | Preserve executable source permissions; deployment does not run the helper |

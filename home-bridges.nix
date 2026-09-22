@@ -18,6 +18,11 @@ let
 
     # emacs: retain ignored packages, caches, and Custom state in place.
     ".emacs.d" = "emacs/.emacs.d";
+
+    # git: preserve hook contents, including unrelated local worktree edits.
+    ".config/git/hooks" = "git/.config/git/hooks";
+    ".config/git/ignore" = "git/.config/git/ignore";
+    ".gitconfig" = "git/.gitconfig";
   };
 in
 {

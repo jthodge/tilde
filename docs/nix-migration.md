@@ -160,6 +160,7 @@ replaced by per-file declarations while writers are active.
 | claude | `CLAUDE.md`, commands directory | Local settings remain regular and untouched; seeding still runs through `make switch` |
 | codex | `.codex/AGENTS.md` | Same canonical preferences; config, authentication, and sessions unmanaged |
 | emacs | `.emacs.d` | Same directory inode and tracked sources; 58 ERT tests and fresh-home smoke; no editor restart or state relocation |
+| git | `.gitconfig`, ignore file, hooks directory | Same source hashes and signing trust; unrelated hook edits excluded from the migration commit |
 
 ## Bin and SSH handoff
 
