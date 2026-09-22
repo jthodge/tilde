@@ -21,7 +21,8 @@ not application data, credentials, package installations, or local preferences.
 | `~/.codex/config.toml` | Codex | Unmanaged | Keep local choices; no gateway or mentor-specific defaults are imposed |
 | `~/.pi/agent/settings.json` | Repository and Pi | Intentional writable link | Review saved preferences/package changes in Git; keep credentials and sessions outside Git |
 | Pi extension and theme sources | Repository | Stow links | Treat as maintained code; test changes before a new session |
-| `~/.config/nvim/lazy-lock.json` | Repository and lazy.nvim | Intentional writable link | Review plugin updates and commit the tested lockfile |
+| Neovim configuration directory | Repository | Home Manager directory bridge | Preserve the existing directory and native editor installation |
+| `~/.config/nvim/lazy-lock.json` | Repository and lazy.nvim | Writable through the directory bridge | Review plugin updates and commit the tested lockfile |
 | Neovim plugin installations | lazy.nvim | Unmanaged cache | Restore from the tracked lockfile; not from a full config checkout |
 | `~/.emacs.d/` source | Repository | Home Manager directory bridge | Edit modules in the repository; preserve the directory and local state locations |
 | Emacs Custom, packages, native cache, backups | Emacs | Ignored local state | Keep durable settings in modules; do not commit generated files |

@@ -23,6 +23,9 @@ let
     ".config/git/hooks" = "git/.config/git/hooks";
     ".config/git/ignore" = "git/.config/git/ignore";
     ".gitconfig" = "git/.gitconfig";
+
+    # nvim: keep the writable lockfile and lazy.nvim's existing ownership.
+    ".config/nvim" = "nvim/.config/nvim";
   };
 in
 {

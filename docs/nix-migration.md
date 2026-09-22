@@ -161,6 +161,7 @@ replaced by per-file declarations while writers are active.
 | codex | `.codex/AGENTS.md` | Same canonical preferences; config, authentication, and sessions unmanaged |
 | emacs | `.emacs.d` | Same directory inode and tracked sources; 58 ERT tests and fresh-home smoke; no editor restart or state relocation |
 | git | `.gitconfig`, ignore file, hooks directory | Same source hashes and signing trust; unrelated hook edits excluded from the migration commit |
+| nvim | `.config/nvim` | Same directory inode and lockfile; headless regression checks; no live plugin updates |
 
 ## Bin and SSH handoff
 
