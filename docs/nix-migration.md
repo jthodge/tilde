@@ -162,6 +162,7 @@ replaced by per-file declarations while writers are active.
 | emacs | `.emacs.d` | Same directory inode and tracked sources; 58 ERT tests and fresh-home smoke; no editor restart or state relocation |
 | git | `.gitconfig`, ignore file, hooks directory | Same source hashes and signing trust; unrelated hook edits excluded from the migration commit |
 | nvim | `.config/nvim` | Same directory inode and lockfile; headless regression checks; no live plugin updates |
+| pi | Ten existing file/directory links under `.pi/agent` | Same source identities, real parent retained, auth and sessions excluded; extension regression tests |
 
 ## Bin and SSH handoff
 

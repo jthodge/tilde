@@ -26,6 +26,18 @@ let
 
     # nvim: keep the writable lockfile and lazy.nvim's existing ownership.
     ".config/nvim" = "nvim/.config/nvim";
+
+    # pi: preserve the real agent parent; auth and sessions are not declared.
+    ".pi/agent/AGENTS.md" = "pi/.pi/agent/AGENTS.md";
+    ".pi/agent/agents" = "pi/.pi/agent/agents";
+    ".pi/agent/extensions" = "pi/.pi/agent/extensions";
+    ".pi/agent/keybindings.json" = "pi/.pi/agent/keybindings.json";
+    ".pi/agent/models.json" = "pi/.pi/agent/models.json";
+    ".pi/agent/presets.json" = "pi/.pi/agent/presets.json";
+    ".pi/agent/prompts" = "pi/.pi/agent/prompts";
+    ".pi/agent/settings.json" = "pi/.pi/agent/settings.json";
+    ".pi/agent/skills" = "pi/.pi/agent/skills";
+    ".pi/agent/themes" = "pi/.pi/agent/themes";
   };
 in
 {

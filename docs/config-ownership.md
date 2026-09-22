@@ -19,8 +19,8 @@ not application data, credentials, package installations, or local preferences.
 | `~/.claude/settings.local.json` | Local user / Claude | Unmanaged | Never publish local permissions or credentials |
 | Codex instruction alias | Repository | Home Manager out-of-store bridge | Same canonical shared preferences; preserve the real `.codex` parent |
 | `~/.codex/config.toml` | Codex | Unmanaged | Keep local choices; no gateway or mentor-specific defaults are imposed |
-| `~/.pi/agent/settings.json` | Repository and Pi | Intentional writable link | Review saved preferences/package changes in Git; keep credentials and sessions outside Git |
-| Pi extension and theme sources | Repository | Stow links | Treat as maintained code; test changes before a new session |
+| `~/.pi/agent/settings.json` | Repository and Pi | Writable Home Manager out-of-store bridge | Review saved preferences/package changes in Git; keep credentials and sessions outside Git |
+| Pi instructions, configuration, extensions, and themes | Repository | Home Manager out-of-store bridges | Preserve the real agent parent, auth, and sessions; test source changes before a new session |
 | Neovim configuration directory | Repository | Home Manager directory bridge | Preserve the existing directory and native editor installation |
 | `~/.config/nvim/lazy-lock.json` | Repository and lazy.nvim | Writable through the directory bridge | Review plugin updates and commit the tested lockfile |
 | Neovim plugin installations | lazy.nvim | Unmanaged cache | Restore from the tracked lockfile; not from a full config checkout |
