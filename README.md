@@ -1,8 +1,8 @@
 # tilde
 
 Personal macOS dotfiles, migrating from [GNU Stow][stow] to Home Manager.
-Home Manager deploys the packages listed in `.home-manager-packages`; the
-remaining packages still use Stow.
+Home Manager deploys thirteen packages listed in `.home-manager-packages`.
+Fish alone remains Stow-owned, pending a quiet window for safe link replacement.
 See the [current migration checkpoint and recovery](docs/nix-migration.md).
 
 ## Prerequisites (manual, one-time)
@@ -210,7 +210,7 @@ models from Pi.
 ## Hooks
 
 The `git` package ships a staged-secret pre-commit hook at
-`git/.config/git/hooks/pre-commit`. After `stow git`, `~/.gitconfig`
+`git/.config/git/hooks/pre-commit`. After Home Manager activation, `~/.gitconfig`
 points `core.hooksPath` at `~/.config/git/hooks`, making the scanner
 active for every commit on this host. Bypass requires the explicit
 `git commit --no-verify` escape after manual review.

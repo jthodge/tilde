@@ -2,6 +2,8 @@
 import os
 from pathlib import Path
 import runpy
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -116,6 +118,27 @@ class AdoptHomeLinksTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             apply(records)
         self.assertEqual(target.read_text(), "new local state\n")
+
+    def test_cli_apply_requires_explicit_quiet_window(self):
+        source, target, candidate = self.link(directory=True)
+        before = os.readlink(target)
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve().parents[1] / "adopt-home-links"),
+             "--home", str(self.home), "--generation", str(self.generation),
+             "--target", "config", "--apply"], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--quiescent", result.stderr)
+        self.assertEqual(os.readlink(target), before)
+        self.assertEqual(result.stdout, "")
+
+    def test_cli_apply_accepts_quiet_fixture(self):
+        source, target, candidate = self.link(directory=True)
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve().parents[1] / "adopt-home-links"),
+             "--home", str(self.home), "--generation", str(self.generation),
+             "--target", "config", "--apply", "--quiescent"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(os.readlink(target), str(candidate))
 
     def test_replace_failure_preserves_link_and_cleans_temporary_directory(self):
         source, target, candidate = self.link()

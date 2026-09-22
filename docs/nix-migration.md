@@ -3,8 +3,10 @@
 ## Current checkpoint
 
 `.home-manager-packages` and `.stow-packages` are the current ownership inventory.
-Transfers are committed package by package. Runtime installation ownership and
-application state locations remain unchanged.
+Thirteen packages are Home Manager-owned; only Fish remains on Stow. Transfers
+are committed package by package. Runtime installation ownership and application
+state locations remain unchanged. Fish's handoff is blocked on a quiet window
+by the concurrent-lookup finding below, not just by mutable-state relocation.
 
 This is an incremental, behavior-preserving migration, not an application or
 runtime redesign. The current flake targets Apple Silicon macOS
@@ -133,11 +135,23 @@ link destinations and recovery artifacts from garbage collection.
 Preview `python3 scripts/adopt-home-links --generation GENERATION --target TARGET`
 (repeat `--target` for each boundary). Save its JSON metadata. Only when every
 current and candidate link resolves to the same path and inode, apply with
-`--apply`. The helper refuses regular files, escaping or symlinked parents,
-overlapping targets, and different sources. It stages a symlink beside the target
-and uses `os.replace`, so the link is not deliberately absent between managers.
+`--apply --quiescent`, after confirming affected readers and writers are quiet.
+The helper requires that acknowledgement and refuses regular files, escaping
+or symlinked parents, overlapping targets, and different sources. It stages a
+symlink beside the target and uses `os.replace`, so the link is not deliberately
+absent between managers.
 It never reads or copies application state. Multiple link replacements and Home
 Manager activation are not one transaction; stop and inspect any failure.
+
+**Atomic namespace replacement is not an uninterrupted-path-lookup guarantee.**
+On this macOS 15.3.1 host, disposable concurrent-reader stress tests over 1,000
+replacements reported `EINVAL` (`Invalid argument`) 55 times with the pinned
+coreutils 9.11 `ln -Tsf`, and 7 times with `os.replace`. This is a fixture finding,
+not an observed live application failure. It does not establish the kernel-level
+cause or a per-handoff failure probability. The helper's unit tests prove
+source preservation and refusal behavior, not continuous availability under
+concurrent pathname lookup. Use a quiet window for interruption-sensitive
+handoffs. Normal Home Manager activation can also relink existing targets.
 
 Then preview and activate the pinned generation. Check immediate Home Manager
 link targets, resolved source identity, source hashes, and `make check`. Do not
@@ -146,6 +160,13 @@ handoff, the saved original link strings can be restored with the same guarded,
 atomic same-source replacement; keep both GC roots until recovery is verified.
 After activation, recovery must also reconcile the active generation and package
 manifests. Never blindly restore older source contents or state snapshots.
+Do not activate a generation that removes live application directory bridges
+while their readers or writers must remain uninterrupted.
+
+Local records under `~/.local/state/tilde/nix-handoffs/` retain pinned previous
+and candidate generations, link metadata, source hashes, and activation logs.
+The Fish record contains an **unactivated** candidate and deferred patch, plus
+the concurrency results. Do not activate it while mission-critical Fish jobs run.
 
 This does not move Fish universal variables, Emacs packages/caches, Neovim state,
 or tmux plugins. Separating that mutable state is a later, explicit migration
@@ -310,9 +331,15 @@ SSH connection was used as a deployment test.
 Checker tests cover bridge source resolution and duplicate ownership, not the
 Home Manager activation engine or a fresh macOS bootstrap.
 
-Fish state relocation remains deferred while mission-critical jobs run. Its
-existing directory boundary can instead be preserved with a same-target bridge;
-that changes ownership without moving universal variables or local overrides.
-Keep Homebrew Fish, Volta, uv, and startup order unchanged. Do not combine the
-bridge with `programs.fish` conversion or a shell redesign. Retain Stow until
-every remaining package has a verified replacement owner.
+Fish remains Stow-owned and is not imported by Home Manager. Its directory bridge
+was built and inspected but **not adopted or activated**, because the additional
+concurrency test failed before handoff. The unactivated draft is parked outside
+Git; the earlier file-level module is also still deferred. No Fish jobs were
+stopped, and universal variables/local overrides were not moved or copied.
+
+At an approved quiet window, choose a reviewed directory bridge or an explicit
+mutable-state relocation plan. Preserve Homebrew Fish, Volta, uv, and startup
+order; do not combine this with `programs.fish` conversion or a shell redesign.
+The final handoff also needs empty-Stow-manifest handling in the legacy Make
+targets; that tested draft is parked with the Fish candidate. Retain Stow until
+Fish has a verified replacement owner.

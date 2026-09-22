@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preview or atomically adopt existing same-target symlinks into a pinned HM generation."""
+"""Preview or adopt same-target symlinks into a pinned HM generation during a quiet window."""
 import argparse
 import json
 import os
@@ -57,7 +57,7 @@ def apply(records: list[dict[str, str]]) -> None:
         with tempfile.TemporaryDirectory(prefix=".tilde-adopt-", dir=target.parent) as temporary:
             staging = Path(temporary) / "link"
             staging.symlink_to(candidate)
-            # Atomic replacement of the link, not its referent. No unlink gap.
+            # Replace the link, not its referent. Concurrent lookup can still fail.
             os.replace(staging, target)
         if os.readlink(target) != record["after"] or not target.samefile(candidate):
             raise ValueError("post-adoption identity check failed: " + str(target))
@@ -69,8 +69,13 @@ def main() -> int:
     parser.add_argument("--generation", required=True, type=Path)
     parser.add_argument("--target", action="append", required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--quiescent", action="store_true",
+                        help="confirm affected readers and writers are quiescent; required with --apply")
     args = parser.parse_args()
     try:
+        if args.apply and not args.quiescent:
+            raise ValueError("--apply requires --quiescent: atomic rename does not "
+                             "guarantee uninterrupted concurrent path lookup")
         records = plan(args.home, args.generation, args.target)
         if args.apply:
             apply(records)
