@@ -1,9 +1,10 @@
 # macOS Nix migration
 
-## Current checkpoint: five packages bridged
+## Current checkpoint
 
-Home Manager owns `bash`, `bin`, `ghostty`, `ssh`, and `zsh`. Nine packages
-remain Stow-owned, including the deferred Fish handoff.
+`.home-manager-packages` and `.stow-packages` are the current ownership inventory.
+Transfers are committed package by package. Runtime installation ownership and
+application state locations remain unchanged.
 
 This is an incremental, behavior-preserving migration, not an application or
 runtime redesign. The current flake targets Apple Silicon macOS
@@ -16,6 +17,7 @@ Fresh-machine bootstrap has not been validated end-to-end.
 | Ghostty configuration | Standalone Home Manager, through `home.nix` |
 | Bash and Zsh configuration | Standalone Home Manager, through `home-shells.nix` |
 | Bin helper and SSH config/public signers | Standalone Home Manager, through `home-files.nix` |
+| Preserved file/directory boundaries | Standalone Home Manager, through `home-bridges.nix` |
 | Ghostty and Fish executables | Homebrew |
 | Node, pnpm, Yarn | Volta |
 | Python installations and environments | uv / project |
@@ -114,6 +116,47 @@ idempotence does not mean no commands execute.
 configuration. It does **not** build or activate Home Manager. On a fresh home,
 targets from `.home-manager-packages` will be missing from `make check` until
 Home Manager activation.
+
+## Preserving existing directory boundaries
+
+A directory bridge changes its deployment owner without relocating its contents.
+`home-bridges.nix` uses absolute out-of-store source strings and `recursive = false`.
+Ignored mutable files remain outside the store, in their original locations.
+Never substitute a directory copy, a `path:` flake snapshot of the dirty checkout,
+or file-by-file state relocation for this bridge.
+
+For a reviewed candidate, first pin both it and the previous generation with
+`nix-store --realise GENERATION --add-root RECORD/candidate --indirect` (and a
+separate `RECORD/previous` root). Keep the record outside Git. The roots protect
+link destinations and recovery artifacts from garbage collection.
+
+Preview `python3 scripts/adopt-home-links --generation GENERATION --target TARGET`
+(repeat `--target` for each boundary). Save its JSON metadata. Only when every
+current and candidate link resolves to the same path and inode, apply with
+`--apply`. The helper refuses regular files, escaping or symlinked parents,
+overlapping targets, and different sources. It stages a symlink beside the target
+and uses `os.replace`, so the link is not deliberately absent between managers.
+It never reads or copies application state. Multiple link replacements and Home
+Manager activation are not one transaction; stop and inspect any failure.
+
+Then preview and activate the pinned generation. Check immediate Home Manager
+link targets, resolved source identity, source hashes, and `make check`. Do not
+restart applications just to change link ownership. For a failed pre-activation
+handoff, the saved original link strings can be restored with the same guarded,
+atomic same-source replacement; keep both GC roots until recovery is verified.
+After activation, recovery must also reconcile the active generation and package
+manifests. Never blindly restore older source contents or state snapshots.
+
+This does not move Fish universal variables, Emacs packages/caches, Neovim state,
+or tmux plugins. Separating that mutable state is a later, explicit migration
+that may still need a quiet window. Shared state directories must never be
+replaced by per-file declarations while writers are active.
+
+### Package checkpoints
+
+| Package | Preserved boundaries | Verification |
+| --- | --- | --- |
+| agents | `.agents` | Same directory inode and source paths; regression suite |
 
 ## Bin and SSH handoff
 
@@ -260,11 +303,9 @@ SSH connection was used as a deployment test.
 Checker tests cover bridge source resolution and duplicate ownership, not the
 Home Manager activation engine or a fresh macOS bootstrap.
 
-Fish is deferred while mission-critical jobs run. Its audited directory-level
-Stow link also exposes ignored universal-variable state. It is not imported by
-the current Home Manager configuration. Preserve that state and local overrides
-when a quiet handoff window becomes available; keep Homebrew Fish, Volta, uv,
-and the existing startup phase order unchanged. Do not combine that handoff
-with `programs.fish` conversion or a shell redesign. Continue migrating other
-packages, but retain Stow until Fish and every other remaining package have a
-verified replacement owner.
+Fish state relocation remains deferred while mission-critical jobs run. Its
+existing directory boundary can instead be preserved with a same-target bridge;
+that changes ownership without moving universal variables or local overrides.
+Keep Homebrew Fish, Volta, uv, and startup order unchanged. Do not combine the
+bridge with `programs.fish` conversion or a shell redesign. Retain Stow until
+every remaining package has a verified replacement owner.

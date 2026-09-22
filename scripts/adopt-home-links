@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Preview or atomically adopt existing same-target symlinks into a pinned HM generation."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+
+def plan(home: Path, generation: Path, targets: list[str]) -> list[dict[str, str]]:
+    home = home.resolve(strict=True)
+    files = (generation / "home-files").resolve(strict=True)
+    if not targets or len(set(targets)) != len(targets):
+        raise ValueError("targets must be nonempty and unique")
+    parts = [Path(name) for name in targets]
+    for path in parts:
+        if path.is_absolute() or not path.parts or any(p in (".", "..") for p in path.parts):
+            raise ValueError("targets must be relative paths without traversal")
+    for first in parts:
+        if any(first != second and first in second.parents for second in parts):
+            raise ValueError("overlapping targets are not supported")
+    result = []
+    for relative in parts:
+        current = home / relative
+        candidate = files / relative
+        # Never write through a parent symlink into a checkout or private state.
+        for parent in current.parents:
+            if parent == home:
+                break
+            if parent.is_symlink():
+                raise ValueError("symlinked target parent: " + str(relative))
+        if not current.is_symlink() or not candidate.is_symlink():
+            raise ValueError("both targets must already be symlinks: " + str(relative))
+        if not candidate.parent.resolve(strict=True).is_relative_to(files):
+            raise ValueError("candidate has an escaping parent: " + str(relative))
+        if current.resolve(strict=True) != candidate.resolve(strict=True) or not current.samefile(candidate):
+            raise ValueError("different resolved source: " + str(relative))
+        stat = current.stat()
+        result.append({"target": str(current), "before": os.readlink(current),
+                       "after": str(candidate), "source": str(current.resolve(strict=True)),
+                       "identity": f"{stat.st_dev}:{stat.st_ino}"})
+    return result
+
+
+def apply(records: list[dict[str, str]]) -> None:
+    for record in records:
+        target = Path(record["target"])
+        candidate = Path(record["after"])
+        stat = target.stat()
+        if (any(parent.is_symlink() for parent in target.parents)
+                or not target.is_symlink() or os.readlink(target) != record["before"]
+                or f"{stat.st_dev}:{stat.st_ino}" != record["identity"]
+                or str(target.resolve(strict=True)) != record["source"]
+                or not target.samefile(candidate)):
+            raise ValueError("target changed after preview: " + str(target))
+        with tempfile.TemporaryDirectory(prefix=".tilde-adopt-", dir=target.parent) as temporary:
+            staging = Path(temporary) / "link"
+            staging.symlink_to(candidate)
+            # Atomic replacement of the link, not its referent. No unlink gap.
+            os.replace(staging, target)
+        if os.readlink(target) != record["after"] or not target.samefile(candidate):
+            raise ValueError("post-adoption identity check failed: " + str(target))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--home", type=Path, default=Path.home())
+    parser.add_argument("--generation", required=True, type=Path)
+    parser.add_argument("--target", action="append", required=True)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    try:
+        records = plan(args.home, args.generation, args.target)
+        if args.apply:
+            apply(records)
+        print(json.dumps({"applied": args.apply, "links": records}, indent=2))
+        return 0
+    except (OSError, ValueError) as error:
+        print("adopt-home-links: " + str(error), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

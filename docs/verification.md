@@ -46,6 +46,9 @@ Python and its possibly unsupported syntax.
   dependencies, malformed manifests, and Git/path inspection failures. Bridge
   tests check resolved source identity and reject duplicate deployment owners;
   they do not run Home Manager or prove the provenance of live links.
+  Atomic-adoption tests use synthetic files and directories, preserve referent
+  identity and private fixture permissions, and reject conflicting or unsafe
+  targets. They do not read private user state.
 - **Policy:** targeted text checks prevent known signing/publication conflicts.
   They do not prove that an agent will obey prose or that heuristic permission
   guards are a sandbox. Extension boundaries and their documented limits are

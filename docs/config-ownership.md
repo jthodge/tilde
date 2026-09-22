@@ -12,7 +12,7 @@ not application data, credentials, package installations, or local preferences.
 | SSH config and public `allowed_signers` | Repository | Home Manager out-of-store bridge | Preserve source bytes and private parent-directory permissions; no key generation |
 | SSH known hosts and local includes | SSH / local tools | Unmanaged | Keep Conductor's included config local; do not copy whole SSH directories into Nix |
 | Home Manager demonstration file and housekeeping | Home Manager | Generation activation | Inspect the generation and its dedicated file/application/font targets |
-| Shared agent instructions and skills | Repository | Stow links | Edit the canonical source; restart sessions to load it |
+| Shared agent instructions and skills | Repository | Home Manager directory bridge | Edit the canonical source; restart sessions to load it |
 | `~/.claude/settings.json` | Claude | Seed once, regular local file | Preserve local model, plugin and permission choices; template changes do not update existing files |
 | `~/.claude/settings.local.json` | Local user / Claude | Unmanaged | Never publish local permissions or credentials |
 | `~/.codex/config.toml` | Codex | Unmanaged | Keep local choices; no gateway or mentor-specific defaults are imposed |

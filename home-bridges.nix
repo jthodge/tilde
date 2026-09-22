@@ -1,0 +1,18 @@
+{ config, ... }:
+
+let
+  checkout = "${config.home.homeDirectory}/tilde";
+
+  # Preserve existing deployment boundaries, including mutable state locations.
+  # These are out-of-store links, never directory copies or recursive links.
+  links = {
+    # agents
+    ".agents" = "agents/.agents";
+  };
+in
+{
+  home.file = builtins.mapAttrs (_: source: {
+    source = config.lib.file.mkOutOfStoreSymlink "${checkout}/${source}";
+    recursive = false;
+  }) links;
+}
