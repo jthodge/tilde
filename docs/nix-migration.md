@@ -157,6 +157,7 @@ replaced by per-file declarations while writers are active.
 | Package | Preserved boundaries | Verification |
 | --- | --- | --- |
 | agents | `.agents` | Same directory inode and source paths; regression suite |
+| claude | `CLAUDE.md`, commands directory | Local settings remain regular and untouched; seeding still runs through `make switch` |
 
 ## Bin and SSH handoff
 

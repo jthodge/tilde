@@ -2,6 +2,7 @@
 agents
 bash
 bin
+claude
 ghostty
 ssh
 zsh
