@@ -1,6 +1,6 @@
 # macOS Nix migration
 
-## Current checkpoint: Ghostty bridge
+## Current checkpoint: Ghostty, Bash, and Zsh bridges
 
 This is an incremental, behavior-preserving migration, not an application or
 runtime redesign. The current flake targets Apple Silicon macOS
@@ -11,6 +11,7 @@ Fresh-machine bootstrap has not been validated end-to-end.
 | --- | --- |
 | Packages in `.stow-packages` | Stow, through `make switch` |
 | Ghostty configuration | Standalone Home Manager, through `home.nix` |
+| Bash and Zsh configuration | Standalone Home Manager, through `home-shells.nix` |
 | Ghostty and Fish executables | Homebrew |
 | Node, pnpm, Yarn | Volta |
 | Python installations and environments | uv / project |
@@ -18,8 +19,9 @@ Fresh-machine bootstrap has not been validated end-to-end.
 
 `.home-manager-packages` records checkout-layout packages transferred to the
 out-of-store bridge. It does not generate Home Manager declarations; `home.nix`
-does that. Each package belongs to exactly one deployment manifest. These
-manifests describe the intended owner, not evidence that activation succeeded.
+and its imported modules do that. Each package belongs to exactly one deployment
+manifest. These manifests describe the intended owner, not evidence that
+activation succeeded.
 Home Manager also manages the demonstration file and its default housekeeping
 links, profiles, and dedicated application/font directories.
 
@@ -29,6 +31,11 @@ The Ghostty link chain is now:
 ~/.config/ghostty/             real directory
   config -> Home Manager store links -> ~/tilde/ghostty/.config/ghostty/config
 ```
+
+Bash and Zsh use individual links for `.bash_profile`, `.spaceshiprc.zsh`,
+`.zprofile`, `.zshenv`, and `.zshrc`, pointing back to their original checkout
+sources. No generated shell initialization or Nix-managed shell packages are
+introduced.
 
 Edit the checkout source directly, then reload Ghostty. The bridge preserves
 live edits without rebuilding Nix. Do not edit store outputs. Do not put secrets
@@ -101,9 +108,40 @@ idempotence does not mean no commands execute.
 
 `make switch` only restows the remaining Stow packages and applies seed-only
 configuration. It does **not** build or activate Home Manager. On a fresh home,
-Ghostty is expected to be missing from `make check` until Home Manager activation.
+Ghostty, Bash, and Zsh configuration will be missing from `make check` until
+Home Manager activation.
 
-## One-time handoff from the old Stow layout
+## Bash and Zsh handoff
+
+These five targets were already direct file symlinks under a real home directory,
+with no mutable state being relocated. After inspecting the candidate and
+verifying source identity, move `bash` and `zsh` from `.stow-packages` to
+`.home-manager-packages` and confirm `make -n switch` excludes them.
+
+For this reviewed layout, Home Manager's collision check accepts identical
+contents and its link step replaces existing symlinks. A separate Stow unlink
+is unnecessary; avoid leaving startup files absent while activation runs.
+Preview and activate the reviewed generation, then inspect each immediate link
+and resolved source. An "identical" diagnostic alone is not proof of ownership.
+Do not generalize this procedure to directory symlinks, regular files, or
+conflicting contents, and do not enable blanket force.
+
+The pre-handoff checkpoint is commit `8b07010`, with Ghostty-only generation
+`/nix/store/9ksmkamd2h3mn613qpf0jirhpi6qvpnb-home-manager-generation`.
+The reviewed Bash/Zsh generation is
+`/nix/store/4vmy3wpbiqaw3v8hr76ncrd0q93i2b8n-home-manager-generation`.
+
+To recover across this checkpoint, first preview and activate the reviewed
+pre-handoff configuration, verifying it releases only the five Bash/Zsh links
+in addition to expected housekeeping updates. Return `bash` and `zsh` to Stow's
+manifest and remove them from Home Manager's manifest. Preview restoration with
+`stow --simulate --verbose --dir . --target "$HOME" bash zsh`; only apply without
+`--simulate` if its scope is correct and there are no conflicts. Verify source
+hashes and `make check`. Later migrations may require rebuilding a rollback
+configuration that retains their declarations rather than using this old
+artifact. No source-content rollback is implied.
+
+## One-time Ghostty handoff from the old Stow layout
 
 Do not repeat this on an already migrated home. Keep an existing terminal open
 and avoid reloading Ghostty while its configuration is temporarily absent.
@@ -137,10 +175,16 @@ and avoid reloading Ghostty while its configuration is temporarily absent.
    the checkout source hash is unchanged. Preview and activate Home Manager as
    above. A missing-Ghostty report during the gap is expected.
 
-## Recovery boundaries
+## Ghostty recovery boundaries
 
-**Before any live Home Manager activation:** return `ghostty` to `.stow-packages`
-and remove it from `.home-manager-packages`. Preview restoration:
+The following describes the original Ghostty checkpoint. After subsequent
+migrations, an older generation can also remove their managed links. For a
+Ghostty-only rollback, rebuild a reviewed configuration that retains unrelated
+current declarations rather than blindly activating the original artifact.
+
+**Before any live Home Manager activation of the Ghostty candidate:** return
+`ghostty` to `.stow-packages` and remove it from `.home-manager-packages`.
+Preview restoration:
 
 ```fish
 stow --simulate --verbose --dir . --target "$HOME" ghostty
@@ -170,11 +214,18 @@ Application settings, installations, and credentials have their own owners.
 
 The Ghostty checkpoint passed `make verify`, all 148 live deployment entries,
 `make doctor`, repeated activation, and manual Ghostty reload/new-tab checks.
+The Bash/Zsh handoff also verified all five Home Manager link targets, unchanged
+source hashes, repeated activation, and the existing isolated shell regression
+suite. It did not require restarting Fish or its running jobs.
 `make verify` does not build Nix or exercise live Home Manager activation.
 Checker tests cover bridge source resolution and duplicate ownership, not the
 Home Manager activation engine or a fresh macOS bootstrap.
 
-Next, audit Fish before changing it: its directory-level Stow link also exposes
-ignored universal-variable state. Preserve that state and local overrides;
-keep Homebrew Fish, Volta, uv, and the existing startup phase order unchanged.
-Do not combine this handoff with `programs.fish` conversion or a shell redesign.
+Fish is deferred while mission-critical jobs run. Its audited directory-level
+Stow link also exposes ignored universal-variable state. It is not imported by
+the current Home Manager configuration. Preserve that state and local overrides
+when a quiet handoff window becomes available; keep Homebrew Fish, Volta, uv,
+and the existing startup phase order unchanged. Do not combine that handoff
+with `programs.fish` conversion or a shell redesign. Continue migrating other
+packages, but retain Stow until Fish and every other remaining package have a
+verified replacement owner.

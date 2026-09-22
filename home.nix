@@ -4,6 +4,8 @@ let
   checkout = "${config.home.homeDirectory}/tilde";
 in
 {
+  imports = [ ./home-shells.nix ];
+
   home.username = "jth";
   home.homeDirectory = "/Users/jth";
 

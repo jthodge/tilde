@@ -1,5 +1,4 @@
 agents
-bash
 bin
 claude
 codex
@@ -10,4 +9,3 @@ nvim
 pi
 ssh
 tmux
-zsh
