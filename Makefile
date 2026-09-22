@@ -31,15 +31,27 @@ help: ## Show this help
 		| awk 'BEGIN {FS = ":.*?$(HASH)$(HASH) "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
 dry-run: ## Simulate Stow deployment and seeding, write nothing (default)
+ifneq ($(strip $(PACKAGES)),)
 	stow --simulate --verbose --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
+else
+	@echo "No Stow packages declared; Home Manager activation is separate." >&2
+endif
 	@python3 scripts/seed-configs
 
 switch: ## Deploy .stow-packages and seed configs, not Home Manager
+ifneq ($(strip $(PACKAGES)),)
 	stow --restow --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
+else
+	@echo "No Stow packages declared; Home Manager activation is separate." >&2
+endif
 	@python3 scripts/seed-configs --apply
 
 unstow: ## Remove links for .stow-packages; leave Home Manager and seeds
+ifneq ($(strip $(PACKAGES)),)
 	stow --delete --dir $(STOW_DIR) --target $(STOW_TARGET) $(PACKAGES)
+else
+	@echo "No Stow packages declared; nothing to unstow." >&2
+endif
 
 check: ## Compare the live $HOME against this checkout
 	@scripts/check

@@ -50,8 +50,10 @@ Python and its possibly unsupported syntax.
   identity and private fixture permissions, and reject conflicting or unsafe
   targets. CLI tests require an explicit quiet-window acknowledgement before
   applying a handoff. They do not read private user state or prove uninterrupted
-  concurrent path lookup. The macOS stress finding and deferred Fish handoff are
-  documented in [nix-migration.md](nix-migration.md).
+  concurrent path lookup. Make-target tests verify that empty manifests skip Stow
+  while preserving seed-only settings, and that nonempty manifests and Stow
+  failures retain their existing behavior. The macOS stress finding and Fish
+  handoff are documented in [nix-migration.md](nix-migration.md).
 - **Policy:** targeted text checks prevent known signing/publication conflicts.
   They do not prove that an agent will obey prose or that heuristic permission
   guards are a sandbox. Extension boundaries and their documented limits are

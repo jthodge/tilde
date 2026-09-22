@@ -3,10 +3,11 @@
 ## Current checkpoint
 
 `.home-manager-packages` and `.stow-packages` are the current ownership inventory.
-Thirteen packages are Home Manager-owned; only Fish remains on Stow. Transfers
-are committed package by package. Runtime installation ownership and application
-state locations remain unchanged. Fish's handoff is blocked on a quiet window
-by the concurrent-lookup finding below, not just by mutable-state relocation.
+All fourteen deployment packages are Home Manager-owned; `.stow-packages` has
+no active entries. Transfers were committed package by package. Runtime
+installation ownership and application state locations remain unchanged. This
+completes the out-of-store bridge phase, not native-module adoption or
+nix-darwin integration.
 
 This is an incremental, behavior-preserving migration, not an application or
 runtime redesign. The current flake targets Apple Silicon macOS
@@ -15,7 +16,7 @@ Fresh-machine bootstrap has not been validated end-to-end.
 
 | Resource | Current deployment or installation owner |
 | --- | --- |
-| Packages in `.stow-packages` | Stow, through `make switch` |
+| Packages in `.stow-packages` | None active; legacy Stow targets remain for recovery |
 | Ghostty configuration | Standalone Home Manager, through `home.nix` |
 | Bash and Zsh configuration | Standalone Home Manager, through `home-shells.nix` |
 | Bin helper and SSH config/public signers | Standalone Home Manager, through `home-files.nix` |
@@ -28,8 +29,8 @@ Fresh-machine bootstrap has not been validated end-to-end.
 `.home-manager-packages` records checkout-layout packages transferred to the
 out-of-store bridge. It does not generate Home Manager declarations; `home.nix`
 and its imported modules do that. Each package belongs to exactly one deployment
-manifest. These manifests describe the intended owner, not evidence that
-activation succeeded.
+manifest, and `.stow-packages` currently contains only comments. These manifests
+describe the intended owner, not evidence that activation succeeded.
 Home Manager also manages the demonstration file and its default housekeeping
 links, profiles, and dedicated application/font directories.
 
@@ -77,7 +78,8 @@ shasum -a 256 "$hm_build/home-files/.config/ghostty/config"
 The resolved path must be the checkout source. Compare the hash with the
 reviewed source; a changed hash is not automatically wrong after intentional
 edits. If `~/.config/ghostty` is still a Stow directory symlink, perform the
-handoff below before activation. Never force through an existing target.
+handoff below before activation. Other old Stow directory links need the reviewed
+same-target adoption procedure below. Never force through an existing target.
 
 Preview, inspect its output, and only then activate the same artifact:
 
@@ -114,8 +116,10 @@ Fish startup, appearance, and Option/Alt behavior. Repeat activation to check
 that an unchanged artifact reuses the generation. It can still relink files;
 idempotence does not mean no commands execute.
 
-`make switch` only restows the remaining Stow packages and applies seed-only
-configuration. It does **not** build or activate Home Manager. On a fresh home,
+`make switch` retains compatibility with a nonempty Stow manifest and applies
+seed-only configuration. With the current comment-only manifest, it skips Stow,
+as do `make dry-run` and `make unstow`; seeding and seed previews remain
+available. It does **not** build or activate Home Manager. On a fresh home,
 targets from `.home-manager-packages` will be missing from `make check` until
 Home Manager activation.
 
@@ -165,8 +169,10 @@ while their readers or writers must remain uninterrupted.
 
 Local records under `~/.local/state/tilde/nix-handoffs/` retain pinned previous
 and candidate generations, link metadata, source hashes, and activation logs.
-The Fish record contains an **unactivated** candidate and deferred patch, plus
-the concurrency results. Do not activate it while mission-critical Fish jobs run.
+Do not activate an older generation that omits a live application's directory
+bridge while its writers are running. In particular, a pre-Fish generation can
+remove the Fish link; rebuild a targeted rollback that retains active Fish and
+other unrelated directory declarations instead.
 
 This does not move Fish universal variables, Emacs packages/caches, Neovim state,
 or tmux plugins. Separating that mutable state is a later, explicit migration
@@ -181,6 +187,7 @@ replaced by per-file declarations while writers are active.
 | claude | `CLAUDE.md`, commands directory | Local settings remain regular and untouched; seeding still runs through `make switch` |
 | codex | `.codex/AGENTS.md` | Same canonical preferences; config, authentication, and sessions unmanaged |
 | emacs | `.emacs.d` | Same directory inode and tracked sources; 58 ERT tests and fresh-home smoke; no editor restart or state relocation |
+| fish | `.config/fish` | Same directory inode; private state stays in place; isolated startup tests; no `programs.fish` conversion |
 | git | `.gitconfig`, ignore file, hooks directory | Same source hashes and signing trust; unrelated hook edits excluded from the migration commit |
 | nvim | `.config/nvim` | Same directory inode and lockfile; headless regression checks; no live plugin updates |
 | pi | Ten existing file/directory links under `.pi/agent` | Same source identities, real parent retained, auth and sessions excluded; extension regression tests |
@@ -331,15 +338,13 @@ SSH connection was used as a deployment test.
 Checker tests cover bridge source resolution and duplicate ownership, not the
 Home Manager activation engine or a fresh macOS bootstrap.
 
-Fish remains Stow-owned and is not imported by Home Manager. Its directory bridge
-was built and inspected but **not adopted or activated**, because the additional
-concurrency test failed before handoff. The unactivated draft is parked outside
-Git; the earlier file-level module is also still deferred. No Fish jobs were
-stopped, and universal variables/local overrides were not moved or copied.
+Fish is now directory-bridged; state relocation remains deferred. Universal
+variables and local overrides remain at their original paths. Homebrew Fish,
+Volta, uv, and startup order are unchanged; `programs.fish` is not enabled. The
+parked file-level Fish module is not imported and must not replace the directory
+bridge without a separate state-migration plan.
 
-At an approved quiet window, choose a reviewed directory bridge or an explicit
-mutable-state relocation plan. Preserve Homebrew Fish, Volta, uv, and startup
-order; do not combine this with `programs.fish` conversion or a shell redesign.
-The final handoff also needs empty-Stow-manifest handling in the legacy Make
-targets; that tested draft is parked with the Fish candidate. Retain Stow until
-Fish has a verified replacement owner.
+Stow has no remaining deployment owners. Its compatibility targets, dependency,
+and historical recovery instructions remain for a separate retirement cleanup.
+Package/runtime ownership decisions, native modules, and nix-darwin are later
+steps; do not combine them with mutable-state relocation or shell redesign.

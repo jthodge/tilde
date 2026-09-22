@@ -5,7 +5,7 @@ not application data, credentials, package installations, or local preferences.
 
 | Target | Owner | Deployment | Runtime writes and recovery |
 | --- | --- | --- | --- |
-| Fish config | Repository | Stow links | Edit the repository; use Git to restore intended content |
+| Fish config | Repository | Home Manager directory bridge | Preserve the live directory and mutable state locations; no shell restart required |
 | tmux config and plugin directory | Repository / TPM | Home Manager out-of-store bridges | Preserve directory identity, plugin ownership, and active sessions |
 | Git config, ignore file, and hooks | Repository | Home Manager out-of-store bridges | Preserve hook contents and 1Password signing; local hook edits remain separate changes |
 | Bash and Zsh config | Repository | Home Manager out-of-store bridge | Edit checkout sources; executable ownership and source contents are unchanged |
@@ -27,7 +27,7 @@ not application data, credentials, package installations, or local preferences.
 | Neovim plugin installations | lazy.nvim | Unmanaged cache | Restore from the tracked lockfile; not from a full config checkout |
 | `~/.emacs.d/` source | Repository | Home Manager directory bridge | Edit modules in the repository; preserve the directory and local state locations |
 | Emacs Custom, packages, native cache, backups | Emacs | Ignored local state | Keep durable settings in modules; do not commit generated files |
-| fish prompt sources | Repository | Stow links | Fish-native prompt and SSH-color helper copied from Mark Tran; Git settings live in `colors.fish`, with no prompt plugin |
+| fish prompt sources | Repository | Home Manager directory bridge | Fish-native prompt and SSH-color helper copied from Mark Tran; Git settings live in `colors.fish`, with no prompt plugin |
 | fish universal variables and `local.fish` | fish / local user | Ignored local state | Do not make bootstrap depend on undeclared universal variables |
 | TPM | Git submodule | Explicit `make plugins` | Restore the submodule revision, then install declared plugins |
 | TPM plugin checkouts | TPM | Ignored runtime installs | `make plugins` installs them; updates are separate from configuration deployment |
@@ -38,10 +38,11 @@ not application data, credentials, package installations, or local preferences.
 
 ## Reviewed upgrades and recovery
 
-See [the macOS Nix migration](nix-migration.md) for the current split between
-Stow and Home Manager, the Ghostty, Bash/Zsh, and bin/SSH handoffs, and recovery
-across those boundaries. Ghostty and Fish executables remain Homebrew-owned;
-Bash/Zsh executable ownership is unchanged. Determinate owns Nix.
+See [the macOS Nix migration](nix-migration.md) for the completed package-by-package
+bridge phase, preserved directory boundaries, and generation-recovery limits.
+The Stow manifest has no active entries; all fourteen deployment packages use
+Home Manager. Ghostty and Fish executables remain Homebrew-owned; Bash/Zsh
+executable ownership is unchanged. Determinate owns Nix.
 
 See [upgrades-and-recovery.md](upgrades-and-recovery.md) for the per-owner
 rollback workflows: Claude settings migration, private ELPA snapshot and
@@ -51,8 +52,10 @@ and roll back independently.
 
 ## Claude settings migration
 
-`claude/.stow-local-ignore` excludes the tracked settings template. After
-link deployment, `make switch` runs `scripts/seed-configs --apply`:
+The tracked settings template is not declared in Home Manager;
+`claude/.stow-local-ignore` also excludes it for legacy Stow recovery.
+`make switch` still runs `scripts/seed-configs --apply`, even with no active
+Stow packages:
 
 - Missing file: validate the template JSON and create a private regular file.
 - Existing regular file: do not read, rewrite, merge, or chmod it.

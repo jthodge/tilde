@@ -1,9 +1,9 @@
 # tilde
 
-Personal macOS dotfiles, migrating from [GNU Stow][stow] to Home Manager.
-Home Manager deploys thirteen packages listed in `.home-manager-packages`.
-Fish alone remains Stow-owned, pending a quiet window for safe link replacement.
-See the [current migration checkpoint and recovery](docs/nix-migration.md).
+Personal macOS dotfiles, deployed through Home Manager out-of-store bridges.
+All fourteen packages are listed in `.home-manager-packages`; `.stow-packages`
+has no active entries. Legacy [GNU Stow][stow] tooling remains for recovery and
+later cleanup. See the [current migration checkpoint and recovery](docs/nix-migration.md).
 
 ## Prerequisites (manual, one-time)
 
@@ -49,8 +49,8 @@ cd ~/tilde
 make brew         # install the Homebrew packages the Brewfile declares
 scripts/setup-tools --check   # report toolchain plan, mutate nothing
 make tools        # explicit: bootstrap Volta node/pnpm/yarn if absent
-make              # = make dry-run: simulate Stow deployment, write nothing
-make switch       # deploy .stow-packages only; resolve conflicts first
+make              # preview seed actions; the Stow manifest has no active entries
+make switch       # seed app-owned configs; does not activate Home Manager
 make plugins      # explicit: init submodules + install TPM plugins
 ```
 
@@ -70,11 +70,11 @@ software and require an explicit invocation. No default target chains
 into them. `make tools` preserves existing Volta defaults and only
 creates `~/.venv/base` if absent.
 
-Each entry in `.stow-packages` mirrors a slice of `$HOME`; it is the
-canonical list for Stow deployment targets. `.home-manager-packages` records
-packages transferred to Home Manager's out-of-store bridge; `home.nix` defines
-their links. A package must not appear in both lists. The `scripts/` directory
-is intentionally not deployed — its contents are invoked in place.
+`.home-manager-packages` records packages transferred to Home Manager's
+out-of-store bridge; `home.nix` defines their links. `.stow-packages` remains
+for legacy recovery workflows but currently has no active deployment entries.
+A package must not appear in both lists. The `scripts/` directory is intentionally
+not deployed — its contents are invoked in place.
 
 > **No clean-machine validation.** This repo is not tested against
 > a fresh macOS install end-to-end. The list above is the proposed

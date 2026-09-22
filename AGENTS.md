@@ -24,7 +24,9 @@ Discipline for any agent (human or otherwise) that touches this repo.
 - Prefer the `Makefile`; run its targets from the repo root.
   - `make` (default) / `make dry-run` — simulate the deployment.
     It writes nothing, so it is safe at any time.
-  - `make switch` — deploy every package in `.stow-packages`.
+  - `make switch` — deploy `.stow-packages` (currently empty) and seed
+    app-owned configs. Home Manager activation is separate; see
+    `docs/nix-migration.md`.
   - `make check` — compare the live `$HOME` against this checkout and
     report `MISSING`, `DRIFT`, or `UNDECLARED`.
   - `make brew` / `make brew-diff` — install the declared Homebrew
@@ -32,7 +34,7 @@ Discipline for any agent (human or otherwise) that touches this repo.
   - `make verify` — run lint, Python typecheck, and isolated regression tests.
     Installs nothing; missing tools are errors. See `docs/verification.md`.
   - `make help` — list every target.
-- Run `make check` after any change to `.stow-packages`, and whenever
+- Run `make check` after changes to either deployment manifest, and whenever
   an app might have replaced a link with a real file.
 - Edit files in this repo. Do not edit the deployed links in `$HOME`.
 
@@ -92,8 +94,9 @@ Discipline for any agent (human or otherwise) that touches this repo.
   split into `allow` / `deny` / `ask` tiers; personal overrides via
   untracked `~/.claude/settings.local.json`.
   **Seed-only.** Claude Code owns the regular local settings file.
-  Stow excludes the tracked template; `make switch` seeds it only if
-  absent. Existing regular files are preserved byte-for-byte. Legacy
+  Home Manager does not declare the tracked template; legacy Stow also
+  excludes it. `make switch` seeds it only if absent. Existing regular files
+  are preserved byte-for-byte. Legacy
   links are backed up and detached without changing their contents.
   Template changes apply to new machines only. Migrate existing local
   preferences explicitly, never overwrite them with the template.

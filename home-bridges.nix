@@ -19,6 +19,10 @@ let
     # emacs: retain ignored packages, caches, and Custom state in place.
     ".emacs.d" = "emacs/.emacs.d";
 
+    # fish: keep universal variables/local overrides in the same live directory.
+    # State relocation and a file-level module require a separate quiet window.
+    ".config/fish" = "fish/.config/fish";
+
     # git: preserve hook contents, including unrelated local worktree edits.
     ".config/git/hooks" = "git/.config/git/hooks";
     ".config/git/ignore" = "git/.config/git/ignore";
