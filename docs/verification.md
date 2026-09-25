@@ -6,8 +6,9 @@ Run from the repository root:
 make test-tools  # explicit installation: ShellCheck and pinned Pyright via uv
 make verify      # lint -> typecheck -> tests; never installs tools or packages
 make smoke       # separate offline Emacs init check, needs installed packages
-make check       # validate Stow and Home Manager bridge source paths
-make doctor      # read-only host/tool inventory
+make home-generation  # build/inspect Home Manager coverage, mutate nothing
+make check            # validate live Home Manager bridge source paths
+make doctor           # read-only host/tool inventory
 ```
 
 `make lint`, `make typecheck`, and `make test` also work separately. Each
@@ -50,10 +51,12 @@ Python and its possibly unsupported syntax.
   identity and private fixture permissions, and reject conflicting or unsafe
   targets. CLI tests require an explicit quiet-window acknowledgement before
   applying a handoff. They do not read private user state or prove uninterrupted
-  concurrent path lookup. Make-target tests verify that empty manifests skip Stow
-  while preserving seed-only settings, and that nonempty manifests and Stow
-  failures retain their existing behavior. The macOS stress finding and Fish
-  handoff are documented in [nix-migration.md](nix-migration.md).
+  concurrent path lookup. Home-generation tests validate that a candidate
+  `home-files` tree covers Home-Manager-owned tracked files without activation.
+  Make-target tests verify that empty manifests skip Stow while preserving
+  seed-only settings, and that nonempty manifests and Stow failures retain their
+  existing behavior. The macOS stress finding and Fish handoff are documented in
+  [nix-migration.md](nix-migration.md).
 - **Policy:** targeted text checks prevent known signing/publication conflicts.
   They do not prove that an agent will obey prose or that heuristic permission
   guards are a sandbox. Extension boundaries and their documented limits are
@@ -80,9 +83,10 @@ fully pinned, so this is reproducible test *procedure*, not a hermetic build.
 
 ## Still manual
 
-Nix evaluation/builds and live Home Manager activation are not part of
-`make verify`. Follow the separate [migration verification](nix-migration.md)
-for artifact inspection, dry-run, link ownership, and application behavior.
+Live Home Manager activation is not part of `make verify`. `make home-generation`
+covers Nix evaluation/build and static generation inspection; follow the separate
+[migration verification](nix-migration.md) for activation dry-run, link ownership,
+and application behavior.
 
 Fresh-machine macOS bootstrap, 1Password and accessibility prompts, actual
 LSP/GUI completion round trips, visual editor interactions, remote clipboard

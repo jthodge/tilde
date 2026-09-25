@@ -1,6 +1,10 @@
 # Configuration adoption decisions
 
-## Keep Stow until a new need justifies a change
+> Historical note: the Nix migration superseded the earlier decision to keep
+> Stow as the long-term deployment mechanism. Stow is now legacy recovery only;
+> see [nix-migration.md](nix-migration.md) for current ownership.
+
+## Original decision: keep Stow until a new need justifies a change
 
 The tracked setup describes one Apple Silicon workstation. The comparison with
 Mark Tran's configuration did not establish a second managed host or a need

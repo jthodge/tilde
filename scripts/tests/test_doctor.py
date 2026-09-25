@@ -133,7 +133,7 @@ class DoctorSubprocess(unittest.TestCase):
             empty = Path(tmp) / "empty"
             empty.mkdir()
             rc, report, _ = self._run([str(empty)])
-        # brew/stow/volta/uv/mise/jq/tmux/fzf/rg/fd/zoxide/gh cannot
+        # brew/volta/uv/mise/jq/tmux/fzf/rg/fd/zoxide/gh cannot
         # possibly live in /usr/bin on stock macOS.
         self.assertTrue(report["missing_required"], msg=report)
         self.assertNotEqual(rc, 0)

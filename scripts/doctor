@@ -33,10 +33,9 @@ GITMODULES = REPO / ".gitmodules"
 TPM_DIR = REPO / "tmux" / ".tmux" / "plugins" / "tpm"
 TPM_PLUGINS_DIR = REPO / "tmux" / ".tmux" / "plugins"
 
-# Required tools every workstation needs before `make switch` is
-# meaningful. Homebrew ships most of them via the Brewfile.
+# Required tools every workstation needs for the normal Home Manager-backed
+# bootstrap. Homebrew ships most of them via the Brewfile.
 REQUIRED_TOOLS = [
-    "stow",
     "fish",
     "node",
     "pnpm",
@@ -74,6 +73,9 @@ OPTIONAL_TOOLS = [
     "pyright",
     "typescript-language-server",
     "prettier",
+    # Legacy recovery only: normal bootstrap skips Stow while the manifest
+    # has no active entries, but old rollback procedures may still use it.
+    "stow",
 ]
 
 

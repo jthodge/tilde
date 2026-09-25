@@ -12,7 +12,9 @@ nix-darwin integration.
 This is an incremental, behavior-preserving migration, not an application or
 runtime redesign. The current flake targets Apple Silicon macOS
 (`aarch64-darwin`), user `jth`, home `/Users/jth`, and checkout `~/tilde`.
-Fresh-machine bootstrap has not been validated end-to-end.
+Fresh-machine bootstrap has not been validated end-to-end on a separate host;
+`make home-generation` validates the built Home Manager file coverage locally
+without activation.
 
 | Resource | Current deployment or installation owner |
 | --- | --- |
@@ -116,12 +118,14 @@ Fish startup, appearance, and Option/Alt behavior. Repeat activation to check
 that an unchanged artifact reuses the generation. It can still relink files;
 idempotence does not mean no commands execute.
 
-`make switch` retains compatibility with a nonempty Stow manifest and applies
-seed-only configuration. With the current comment-only manifest, it skips Stow,
-as do `make dry-run` and `make unstow`; seeding and seed previews remain
-available. It does **not** build or activate Home Manager. On a fresh home,
-targets from `.home-manager-packages` will be missing from `make check` until
-Home Manager activation.
+`make home-generation` builds the activation package and checks that its
+`home-files` tree covers every Home-Manager-owned tracked file, without
+activating it or touching `$HOME`. `make switch` retains compatibility with a
+nonempty Stow manifest and applies seed-only configuration. With the current
+comment-only manifest, it skips Stow, as do `make dry-run` and `make unstow`;
+seeding and seed previews remain available. It does **not** build or activate
+Home Manager. On a fresh home, targets from `.home-manager-packages` will be
+missing from `make check` until Home Manager activation.
 
 ## Preserving existing directory boundaries
 
@@ -344,7 +348,14 @@ Volta, uv, and startup order are unchanged; `programs.fish` is not enabled. The
 parked file-level Fish module is not imported and must not replace the directory
 bridge without a separate state-migration plan.
 
-Stow has no remaining deployment owners. Its compatibility targets, dependency,
-and historical recovery instructions remain for a separate retirement cleanup.
-Package/runtime ownership decisions, native modules, and nix-darwin are later
-steps; do not combine them with mutable-state relocation or shell redesign.
+Native Home Manager modules remain deferred. The current bridge model preserves
+source editability, ignored mutable state, app-owned local files, and existing
+runtime owners. Convert a bridge to a native module only when there is a concrete
+benefit and an explicit state-ownership plan; do not combine that with unrelated
+runtime installation changes or nix-darwin adoption.
+
+Stow has no remaining deployment owners. Its compatibility targets and historical
+recovery instructions remain, but Stow is no longer installed or required by the
+normal bootstrap while `.stow-packages` has no active entries. Package/runtime
+ownership decisions, native modules, and nix-darwin are later steps; do not
+combine them with mutable-state relocation or shell redesign.

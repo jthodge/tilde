@@ -27,6 +27,8 @@ Discipline for any agent (human or otherwise) that touches this repo.
   - `make switch` — deploy `.stow-packages` (currently empty) and seed
     app-owned configs. Home Manager activation is separate; see
     `docs/nix-migration.md`.
+  - `make home-generation` — build and inspect the Home Manager generation
+    without activating it.
   - `make check` — compare the live `$HOME` against this checkout and
     report `MISSING`, `DRIFT`, or `UNDECLARED`.
   - `make brew` / `make brew-diff` — install the declared Homebrew

@@ -1,7 +1,8 @@
-# Makefile for Stow deployment and shared dotfiles verification.
+# Makefile for legacy Stow compatibility and shared dotfiles verification.
 #
-# `make` alone is safe: it simulates Stow deployment and writes nothing.
-# `make switch` deploys .stow-packages, not Home Manager configuration.
+# `make` alone is safe: it previews legacy Stow/seed actions and writes nothing.
+# `make switch` applies seed-only configs and legacy .stow-packages if nonempty.
+# `make home-generation` builds and inspects Home Manager without activation.
 # `make check` compares both deployment manifests against the live $HOME.
 # See docs/nix-migration.md for Home Manager activation.
 
@@ -20,7 +21,7 @@ PACKAGES    := $(shell grep -v '^$(HASH)' .stow-packages | grep -v '^[[:space:]]
 
 PYRIGHT_VERSION := 1.1.403
 
-.PHONY: help dry-run switch unstow check brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools capabilities migrate-claude
+.PHONY: help dry-run switch unstow check home-generation brew brew-diff doctor tools plugins lint typecheck test verify smoke test-tools capabilities migrate-claude
 
 help: ## Show this help
 	@echo "Stow packages: $(PACKAGES)"
@@ -55,6 +56,9 @@ endif
 
 check: ## Compare the live $HOME against this checkout
 	@scripts/check
+
+home-generation: ## Build and inspect the Home Manager generation, write nothing
+	@scripts/check-home-generation
 
 brew: ## Install the packages that the Brewfile declares
 	brew bundle install --file=Brewfile
@@ -101,7 +105,7 @@ migrate-claude: ## Preview the sonnet-defaults-v1 Claude settings migration (rea
 	@python3 scripts/migrate-claude-settings
 
 plugins: ## Init git submodules and install TPM plugins (explicit only)
-	@test -f "$(HOME)/.tmux.conf" || { echo 'Run make switch before make plugins' >&2; exit 1; }
+	@test -f "$(HOME)/.tmux.conf" || { echo 'Activate Home Manager before make plugins' >&2; exit 1; }
 	git submodule update --init --recursive
 	tmux start-server \; set-environment -g TMUX_PLUGIN_MANAGER_PATH "$(HOME)/.tmux/plugins/"
 	@if [ -x tmux/.tmux/plugins/tpm/bin/install_plugins ]; then \

@@ -2,8 +2,9 @@
 
 Personal macOS dotfiles, deployed through Home Manager out-of-store bridges.
 All fourteen packages are listed in `.home-manager-packages`; `.stow-packages`
-has no active entries. Legacy [GNU Stow][stow] tooling remains for recovery and
-later cleanup. See the [current migration checkpoint and recovery](docs/nix-migration.md).
+has no active entries. Legacy [GNU Stow][stow] compatibility remains for recovery,
+but Stow is no longer part of the normal bootstrap. See the
+[current migration checkpoint and recovery](docs/nix-migration.md).
 
 ## Prerequisites (manual, one-time)
 
@@ -56,6 +57,7 @@ make plugins      # explicit: init submodules + install TPM plugins
 
 Next, explicitly install Determinate Nix if needed, then follow the
 [Home Manager build, preview, and activation procedure](docs/nix-migration.md).
+`make home-generation` builds and inspects the candidate without activation;
 `make switch` does not deploy the Home Manager packages. After activation:
 
 ```sh
@@ -76,15 +78,19 @@ for legacy recovery workflows but currently has no active deployment entries.
 A package must not appear in both lists. The `scripts/` directory is intentionally
 not deployed — its contents are invoked in place.
 
-> **No clean-machine validation.** This repo is not tested against
-> a fresh macOS install end-to-end. The list above is the proposed
-> bootstrap procedure; expect to reconcile app-owned config
-> drift (see `make check`) and permission prompts on first launch.
+> **Fresh-machine limit.** `make home-generation` validates Home Manager's
+> generated file coverage locally, but this repo is not tested against a separate
+> fresh macOS install end-to-end. Expect to reconcile app-owned config drift
+> (see `make check`) and permission prompts on first launch.
 
 ## Verifying a deployment
 
 Three diagnostics answer different questions:
 
+- `make home-generation` (`scripts/check-home-generation`) — **does the built
+  Home Manager generation cover every Home-Manager-owned tracked file?** Builds
+  the activation package, inspects its `home-files` tree, and writes nothing to
+  `$HOME`. This is the closest local proxy for a fresh Home Manager bootstrap.
 - `make check` (`scripts/check`) — **does the deployed `$HOME`
   match its ownership rules?** Checks repository-owned links and
   seed-only app-owned files. See [configuration ownership](docs/config-ownership.md).

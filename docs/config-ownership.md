@@ -41,8 +41,9 @@ not application data, credentials, package installations, or local preferences.
 See [the macOS Nix migration](nix-migration.md) for the completed package-by-package
 bridge phase, preserved directory boundaries, and generation-recovery limits.
 The Stow manifest has no active entries; all fourteen deployment packages use
-Home Manager. Ghostty and Fish executables remain Homebrew-owned; Bash/Zsh
-executable ownership is unchanged. Determinate owns Nix.
+Home Manager, and Stow is no longer part of the normal bootstrap. Ghostty and
+Fish executables remain Homebrew-owned; Bash/Zsh executable ownership is
+unchanged. Determinate owns Nix.
 
 See [upgrades-and-recovery.md](upgrades-and-recovery.md) for the per-owner
 rollback workflows: Claude settings migration, private ELPA snapshot and

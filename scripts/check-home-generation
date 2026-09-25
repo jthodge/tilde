@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Validate that a Home Manager generation covers every HM-owned repo file.
+
+The check inspects the generation's ``home-files`` tree only. It does not run
+Home Manager activation and does not read or mutate ``$HOME``.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+REPO = Path(__file__).resolve().parents[1]
+NOT_PACKAGES = {"docs", "scripts", ".github"}
+SEED_ONLY = {"claude/.claude/settings.json"}
+
+
+def abort(message: str) -> int:
+    print("check-home-generation: " + message, file=sys.stderr)
+    print(json.dumps({"ok": False, "error": message}))
+    return 1
+
+
+def manifest_entries(path: Path) -> list[str]:
+    if not path.is_file() or not os.access(path, os.R_OK):
+        raise ValueError(f"{path.name} manifest is missing or unreadable")
+    entries: list[str] = []
+    seen: set[str] = set()
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line in seen:
+            raise ValueError(f"duplicate package or multiple owners: {line}")
+        if (
+            line in (".", "..")
+            or line.startswith("-")
+            or "/" in line
+            or not all(c.isalnum() or c in "_.-" for c in line)
+        ):
+            raise ValueError(f"malformed package name in deployment manifests: {line}")
+        seen.add(line)
+        entries.append(line)
+    return entries
+
+
+def git_ls_files(pkg: str) -> list[str]:
+    proc = subprocess.run(
+        ["git", "ls-files", "-z", "--", pkg],
+        cwd=REPO,
+        text=False,
+        capture_output=True,
+        check=True,
+    )
+    return [item.decode() for item in proc.stdout.split(b"\0") if item]
+
+
+def tracked_top_level_dirs() -> set[str]:
+    proc = subprocess.run(
+        ["git", "ls-files"],
+        cwd=REPO,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return {
+        line.split("/", 1)[0]
+        for line in proc.stdout.splitlines()
+        if "/" in line and line.split("/", 1)[0] not in NOT_PACKAGES
+    }
+
+
+def default_generation() -> Path:
+    proc = subprocess.run(
+        ["nix", "build", "--no-link", "--print-out-paths", ".#homeConfigurations.jth.activationPackage"],
+        cwd=REPO,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return Path(proc.stdout.strip().splitlines()[-1])
+
+
+def validate(generation: Path) -> tuple[list[dict[str, str]], int]:
+    home_files = (generation / "home-files").resolve(strict=True)
+    hm_packages = manifest_entries(REPO / ".home-manager-packages")
+    stow_packages = manifest_entries(REPO / ".stow-packages")
+    problems: list[dict[str, str]] = []
+    checked = 0
+
+    if stow_packages:
+        problems.append({
+            "kind": "stow-active",
+            "path": ".stow-packages",
+            "message": "Stow still owns active packages: " + ", ".join(stow_packages),
+        })
+
+    both = sorted(set(hm_packages) & set(stow_packages))
+    if both:
+        problems.append({
+            "kind": "duplicate-owner",
+            "path": ",".join(both),
+            "message": "package appears in both deployment manifests",
+        })
+
+    declared = set(hm_packages) | set(stow_packages)
+    for directory in sorted(tracked_top_level_dirs() - declared):
+        problems.append({
+            "kind": "undeclared",
+            "path": directory,
+            "message": "tracked top-level directory absent from deployment manifests",
+        })
+
+    for pkg in hm_packages:
+        if not (REPO / pkg).is_dir():
+            problems.append({
+                "kind": "missing-package",
+                "path": pkg,
+                "message": "declared package is absent from the repo",
+            })
+            continue
+        for rel in git_ls_files(pkg):
+            if rel.endswith("/.stow-local-ignore") or rel in SEED_ONLY:
+                continue
+            checked += 1
+            target = home_files / rel.removeprefix(pkg + "/")
+            source = REPO / rel
+            try:
+                want = source.resolve(strict=True)
+            except OSError as error:
+                problems.append({"kind": "source-unresolved", "path": rel, "message": str(error)})
+                continue
+            try:
+                got = target.resolve(strict=True)
+            except OSError as error:
+                problems.append({
+                    "kind": "missing",
+                    "path": rel,
+                    "target": str(target),
+                    "message": str(error),
+                })
+                continue
+            if got != want:
+                problems.append({
+                    "kind": "drift",
+                    "path": rel,
+                    "target": str(target),
+                    "resolved": str(got),
+                    "expected": str(want),
+                    "message": "generation target resolves away from checkout source",
+                })
+    return problems, checked
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("generation", nargs="?", type=Path,
+                        help="activation package to inspect; builds the flake when omitted")
+    args = parser.parse_args()
+    try:
+        generation = args.generation or default_generation()
+        problems, checked = validate(generation)
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        return abort(str(error))
+
+    report = {
+        "ok": not problems,
+        "repo": str(REPO),
+        "generation": str(generation),
+        "checked": checked,
+        "problems": problems,
+    }
+    print(json.dumps(report, indent=2))
+    if problems:
+        print(f"check-home-generation: {len(problems)} problem(s) across {checked} files", file=sys.stderr)
+        return 1
+    print(f"check-home-generation: OK, {checked} Home Manager entries covered", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
