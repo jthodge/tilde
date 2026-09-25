@@ -74,7 +74,7 @@ def test():
     for suite in ("test_plan_mode.mjs", "test_gates.mjs"):
         run("node", "--test", "scripts/tests/pi-extensions/" + suite)
     for suite in ("emacs-config.el", "emacs-workflow.el", "emacs-proj-context.el",
-                  "emacs-context.el"):
+                  "emacs-context.el", "emacs-editing.el"):
         with tempfile.TemporaryDirectory(prefix="tilde-ert-") as home:
             run("emacs", "-Q", "--batch", "-l", "scripts/tests/" + suite,
                 "-f", "ert-run-tests-batch-and-exit",

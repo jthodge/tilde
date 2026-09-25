@@ -12,6 +12,9 @@ directory, so adding a file does not silently change startup behavior.
   `workflow` and `development` (see "Shared project context" below).
   Pure helper; no side effects on load.
 - `interface`: display, editing defaults, initial minibuffer setup.
+- `editing`: small interactive editing conveniences:
+  fill/unfill toggle, confirmed delete-current-buffer-file, and automatic
+  `smerge-mode` when conflict markers are present.
 - `packages`: package declarations. **No refresh, no install at startup.**
 - `lsp`: performance settings, shared language-server configuration,
   and the single completion hook installed on `lsp-mode-hook`.
@@ -130,6 +133,22 @@ The helpers make `process-environment`, `exec-path`, and
 Switching A -> B in a buffer first rolls back to the pre-A snapshot,
 so `exec-path` never accumulates entries across successive
 activations. Deactivation restores the original snapshot verbatim.
+
+## Editing conveniences
+
+This repo adopts small, dependency-free helpers that fit the existing no-Evil
+workflow:
+
+- `M-q` / any remap of `fill-paragraph` now runs `my/fill-or-unfill`. Invoke it
+  once to fill a paragraph; invoke it again immediately to unfill.
+- `my/delete-current-buffer-file` deletes the file visited by the current buffer
+  only after `yes-or-no-p` confirmation, then kills the buffer.
+- `find-file-hook` enables `smerge-mode` automatically when a file contains Git
+  conflict markers.
+
+Larger subsystems remain deferred: Evil/general leader keys, Denote/Org
+knowledge management, Notmuch mail, Popper/Beframe frame workspaces, Ghostel,
+and Eglot migration all need a demonstrated workflow failure before adoption.
 
 ## Workflow pilot
 

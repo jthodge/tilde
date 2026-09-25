@@ -25,6 +25,7 @@
                   "environment"
                   "proj-context"
                   "interface"
+                  "editing"
                   "lsp"
                   "treesitter"
                   "development"
