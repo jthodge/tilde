@@ -354,6 +354,11 @@ runtime owners. Convert a bridge to a native module only when there is a concret
 benefit and an explicit state-ownership plan; do not combine that with unrelated
 runtime installation changes or nix-darwin adoption.
 
+Agent skills, including the Television skills under `agents/.agents/skills`, are
+covered by the existing `agents` directory bridge. Adding tracked skills there
+requires no new Home Manager declaration; `make home-generation` verifies their
+coverage once they are staged or committed.
+
 Stow has no remaining deployment owners. Its compatibility targets and historical
 recovery instructions remain, but Stow is no longer installed or required by the
 normal bootstrap while `.stow-packages` has no active entries. Package/runtime
