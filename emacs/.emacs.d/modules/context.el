@@ -16,6 +16,8 @@
   (expand-file-name "history" my/context--state-dir))
 (defvar my/context--recentf-file
   (expand-file-name "recentf" my/context--state-dir))
+(defvar my/context--recentf-save-timer nil
+  "Idle timer that periodically saves `recentf-list' quietly.")
 
 (defun my/context--ensure-private (path)
   "Create PATH if missing, without truncation; restrict its permissions."
@@ -45,6 +47,14 @@
       ;; Do not clean old remote entries by contacting hosts at startup.
       recentf-auto-cleanup 'never)
 (my/context--ensure-private recentf-save-file)
+(defun my/context-save-recentf-silently ()
+  "Save `recentf-list' without minibuffer noise."
+  (let ((inhibit-message t))
+    (recentf-save-list)))
+(when (timerp my/context--recentf-save-timer)
+  (cancel-timer my/context--recentf-save-timer))
+(setq my/context--recentf-save-timer
+      (run-with-idle-timer 600 t #'my/context-save-recentf-silently))
 (unless recentf-mode (recentf-mode 1))
 
 (setq auto-revert-remote-files nil

@@ -27,6 +27,9 @@
 (require 'subr-x)
 (require 'proj-context)
 
+(setq compilation-message-face nil
+      compilation-scroll-output t)
+
 (define-key global-map (kbd "C-c p") project-prefix-map)
 
 (defvar my/workflow-magit-map

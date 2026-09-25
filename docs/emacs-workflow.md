@@ -26,7 +26,8 @@ directory, so adding a file does not silently change startup behavior.
 - `workflow`: focused pilot for project, git, search, and test bindings
   (see "Workflow pilot" below).
 - `context`: built-in persistent context conveniences (savehist,
-  recentf, global-auto-revert) with local ignored state.
+  recentf, global-auto-revert) with local ignored state. Recent files are
+  periodically saved quietly on an idle timer.
   See "Persistent context" below.
 - `custom-settings`: durable Customize declarations (tracked).
 
@@ -145,6 +146,7 @@ workflow:
   only after `yes-or-no-p` confirmation, then kills the buffer.
 - `find-file-hook` enables `smerge-mode` automatically when a file contains Git
   conflict markers.
+- Compilation buffers scroll with output, matching the test-running workflow.
 
 Larger subsystems remain deferred: Evil/general leader keys, Denote/Org
 knowledge management, Notmuch mail, Popper/Beframe frame workspaces, Ghostel,
