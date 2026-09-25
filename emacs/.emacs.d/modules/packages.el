@@ -32,6 +32,7 @@
     exec-path-from-shell   ; Import PATH/CPATH/LIBRARY_PATH in GUI Emacs
     flycheck               ; Linting and syntax checker
     flycheck-package       ; Elisp package linting for MELPA standards
+    ghostel                ; Ghostty-backed terminal buffers
     go-mode                ; Go editing support
     lsp-mode               ; Language Server Protocol support
     lsp-pyright            ; Language Server Protocol client using pyright Python Language Server

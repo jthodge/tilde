@@ -25,6 +25,8 @@ directory, so adding a file does not silently change startup behavior.
 - `typescript`, `python`, `go`, `elisp`: language-specific setup.
 - `workflow`: focused pilot for project, git, search, and test bindings
   (see "Workflow pilot" below).
+- `ghostel-terminal`: optional Ghostty-backed terminal buffers. It binds
+  `C-c p T` and stays inert until the `ghostel` package is installed.
 - `context`: built-in persistent context conveniences (savehist,
   recentf, global-auto-revert) with local ignored state. Recent files are
   periodically saved quietly on an idle timer.
@@ -148,9 +150,15 @@ workflow:
   conflict markers.
 - Compilation buffers scroll with output, matching the test-running workflow.
 
+Ghostel is adopted as an optional project terminal entry point. `C-c p T` runs
+`my/ghostel-project`, opens Ghostel at the current project root, keeps its native
+module outside `elpa/`, uses `xterm-ghostty`, and applies a Ghostty-like
+terminal palette when the package is installed. Fresh startup remains safe: if
+Ghostel is absent, the command reports how to install it and no network is used.
+
 Larger subsystems remain deferred: Evil/general leader keys, Denote/Org
-knowledge management, Notmuch mail, Popper/Beframe frame workspaces, Ghostel,
-and Eglot migration all need a demonstrated workflow failure before adoption.
+knowledge management, Notmuch mail, Popper/Beframe frame workspaces, and Eglot
+migration all need a demonstrated workflow failure before adoption.
 
 ## Workflow pilot
 

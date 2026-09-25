@@ -36,6 +36,7 @@
                   "go"
                   "elisp"
                   "workflow"
+                  "ghostel-terminal"
                   "context"
                   "custom-settings"))
   (load (expand-file-name (concat "modules/" module ".el") user-emacs-directory)
