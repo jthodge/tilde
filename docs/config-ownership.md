@@ -27,7 +27,7 @@ not application data, credentials, package installations, or local preferences.
 | Neovim plugin installations | lazy.nvim | Unmanaged cache | Restore from the tracked lockfile; not from a full config checkout |
 | `~/.emacs.d/` source | Repository | Home Manager directory bridge | Edit modules in the repository; preserve the directory and local state locations |
 | Emacs Custom, packages, native cache, backups | Emacs | Ignored local state | Keep durable settings in modules; do not commit generated files |
-| fish prompt sources | Repository | Home Manager directory bridge | Fish-native prompt and SSH-color helper copied from Mark Tran; Git settings live in `colors.fish`, with no prompt plugin |
+| fish prompt sources | Repository | Home Manager directory bridge | Fish-native prompt and SSH-color helper; Git settings live in `colors.fish`, with no prompt plugin |
 | fish universal variables and `local.fish` | fish / local user | Ignored local state | Do not make bootstrap depend on undeclared universal variables |
 | TPM | Git submodule | Explicit `make plugins` | Restore the submodule revision, then install declared plugins |
 | TPM plugin checkouts | TPM | Ignored runtime installs | `make plugins` installs them; updates are separate from configuration deployment |

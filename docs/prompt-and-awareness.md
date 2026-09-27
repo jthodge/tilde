@@ -2,8 +2,8 @@
 
 ## Why this design
 
-Ghostty is the sole supported terminal. The prompt is Mark Tran's small
-Fish-native implementation, with no prompt framework or Nerd Font icons.
+Ghostty is the sole supported terminal. The prompt is a small Fish-native
+implementation, with no prompt framework or Nerd Font icons.
 This is a low-noise preference, not a Ghostty rendering limitation. Situational
 awareness that a verbose prompt used to *push* is now *pulled* on demand.
 The optional `ctx` function below is a proposal, not an installed command.
@@ -21,12 +21,10 @@ Sources of truth:
 - `fish/.config/fish/functions/set_pwd_color.fish`
 - The three `__fish_git_prompt_*` settings in `fish/.config/fish/colors.fish`
 
-The two functions are copied verbatim from Mark Tran's `tilde` checkout at
-revision `9deaa1a4f0748c8e39adff28c632916636c33186`, under
-`nix/files/fish/functions/`. The Git settings match his
-`nix/files/fish/config.d/git-prompt.fish`. His checkout is not a runtime or
-test dependency. Fish supplies `prompt_pwd` and `__fish_git_prompt` (the latter
-is a compatibility wrapper for `fish_git_prompt` in current Fish).
+The two functions are repository-owned Fish helpers, and the Git settings live
+in `fish/.config/fish/colors.fish`. No external checkout is a runtime or test
+dependency. Fish supplies `prompt_pwd` and `__fish_git_prompt` (the latter is a
+compatibility wrapper for `fish_git_prompt` in current Fish).
 
 - One line: shortened directory, then Git branch/state, then the command.
 - Directory is magenta locally and blue when `SSH_CLIENT` is nonempty.

@@ -6,10 +6,10 @@
 
 ## Original decision: keep Stow until a new need justifies a change
 
-The tracked setup describes one Apple Silicon workstation. The comparison with
-Mark Tran's configuration did not establish a second managed host or a need
-for system generations. Stow, explicit bootstrap, ownership rules, diagnostics,
-and regression tests address the demonstrated problems without a Nix migration.
+The tracked setup describes one Apple Silicon workstation. The configuration
+review did not establish a second managed host or a need for system generations.
+Stow, explicit bootstrap, ownership rules, diagnostics, and regression tests
+address the demonstrated problems without a Nix migration.
 
 Revisit Nix when at least one of these occurs:
 
@@ -59,7 +59,7 @@ A read-only snapshot on 2026-09-08 found these explicit Boolean values:
 
 No explicit value was returned for global `KeyRepeat`, `InitialKeyRepeat`,
 `ApplePressAndHoldEnabled`, or `NSAutomaticSpellingCorrectionEnabled`. Do not
-replace those with guessed effective defaults or Mark's preferences.
+replace those with guessed effective defaults or external preferences.
 
 Read a value and its stored type before recording a future change:
 

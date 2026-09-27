@@ -52,7 +52,7 @@ Discipline for any agent (human or otherwise) that touches this repo.
 
 ## Fish prompt
 
-- Use Mark Tran's Fish-native prompt: `fish/.config/fish/functions/fish_prompt.fish`
+- Use the repository's Fish-native prompt: `fish/.config/fish/functions/fish_prompt.fish`
   and `set_pwd_color.fish`, with Git settings in `fish/.config/fish/colors.fish`.
 - One line, shortened directory (magenta locally, blue over SSH), yellow Git
   branch, and `±` for unstaged changes. No frames, segment backgrounds, or
